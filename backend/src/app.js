@@ -29,3 +29,5 @@ app.use(cookieParser());
 
 // for parsing application/json
 app.use(express.json({ limit: "50mb", extended: true }));
+
+module.exports = app;
