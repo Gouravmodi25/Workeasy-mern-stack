@@ -3,10 +3,19 @@
   "version": "1.0.0",
   "description": "This is my workEasy project ",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "server": "nodemon index.js -e js",
     "start": "node index.js"
   },
   "author": "gourav-modi,aryan-chouhan",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  }
 }
