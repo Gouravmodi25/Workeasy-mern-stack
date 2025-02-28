@@ -1,0 +1,12 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "This is my workEasy project ",
+  "main": "index.js",
+  "scripts": {
+    "server": "nodemon index.js -e js",
+    "start": "node index.js"
+  },
+  "author": "gourav-modi,aryan-chouhan",
+  "license": "ISC"
+}
