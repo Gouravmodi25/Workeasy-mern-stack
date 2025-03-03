@@ -93,7 +93,7 @@ const userSchema = new mongoose.Schema(
     address: addressSchema,
   },
   {
-    timestamps: true, // Automatically add createdAt & updatedAt
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
