@@ -1,10 +1,11 @@
 const jwt = require("jsonwebtoken");
 const asyncHandler = require("../utils/asyncHandler.js");
 const ApiResponse = require("../utils/ApiResponse.js");
-const UserModel = require("../models/User.js");
+const UserModel = require("../model/user.model.js");
 
-const userAuth = asyncHandler(async (req, _, next) => {
-  const token = req.header("Authorization") || req.cookies?.access_token;
+const userAuth = asyncHandler(async (req, res, next) => {
+  const token = req.header("Authorization") || req.cookies?.accessToken;
+  console.log(token);
 
   try {
     if (!token) {
@@ -16,7 +17,7 @@ const userAuth = asyncHandler(async (req, _, next) => {
     let decodedToken;
 
     try {
-      decodedToken = await jwt.verify(token, process.env.JWT_SECRET_KEY);
+      decodedToken = await jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     } catch (error) {
       return res
         .status(401)
@@ -24,13 +25,14 @@ const userAuth = asyncHandler(async (req, _, next) => {
           new ApiResponse(401, "Invalid or expired token. Please log in again.")
         );
     }
-
+    console.log(decodedToken.id);
     let loggedUser;
 
     try {
-      loggedUser = await UserModel.findById(decodedToken._id).select(
+      loggedUser = await UserModel.findById(decodedToken.id).select(
         "-password"
       );
+      console.log("loggedUser", loggedUser);
     } catch (error) {
       return res
         .status(401)
