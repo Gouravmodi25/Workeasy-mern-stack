@@ -1,3 +1,3 @@
-const DBName = "Work-Easy";
+const DBName = "workeasy";
 
 module.exports = DBName;

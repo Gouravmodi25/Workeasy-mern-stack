@@ -15,7 +15,7 @@ const sendMail = async function (option) {
     from: process.env.EMAIL_FROM,
     to: option.to,
     subject: option.subject,
-    text: option.text,
+    html: option.text,
   };
 
   await transporter.sendMail(mailOptions, function (error, info) {

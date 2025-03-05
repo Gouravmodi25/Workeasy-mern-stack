@@ -32,6 +32,7 @@ const userSchema = new mongoose.Schema(
     fullname: {
       type: String,
       required: true,
+      minlength: 3,
     },
     phoneNumber: {
       type: String,
@@ -110,9 +111,10 @@ userSchema.virtual("age").get(function () {
 
 // for password hashing
 userSchema.pre("save", async function (next) {
-  if (!this.isModified.password) {
+  if (!this.isModified("password")) {
     return next();
   }
+
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });

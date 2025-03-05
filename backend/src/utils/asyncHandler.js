@@ -6,4 +6,4 @@ const asyncHandler = (handlerFunction) => {
   };
 };
 
-module.export = asyncHandler;
+module.exports = asyncHandler;

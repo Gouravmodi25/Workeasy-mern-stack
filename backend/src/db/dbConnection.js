@@ -9,7 +9,7 @@ const connectDB = async () => {
     );
 
     console.log(
-      `"MONGO DB!! Database is connected to server at ", ${connectionString.connection.host}`
+      `"MONGO DB!! Database is connected to server at "${connectionString.connection.host}`
     );
   } catch (error) {
     console.log(`MONGO DB connection error ${error}`);

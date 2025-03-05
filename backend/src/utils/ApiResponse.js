@@ -7,4 +7,4 @@ class ApiResponse {
   }
 }
 
-MediaSourceHandle.exports = ApiResponse;
+module.exports = ApiResponse;

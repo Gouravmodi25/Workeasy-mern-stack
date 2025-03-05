@@ -2,18 +2,23 @@ const twilio = require("twilio");
 
 const sendSms = async function (option) {
   try {
-    const client = new twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    const { TWILIO_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER } = process.env;
 
-    await client.messages.create({
+    if (!TWILIO_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+      throw new Error("Missing Twilio credentials in environment variables.");
+    }
+
+    // Initialize Twilio client
+    const client = new twilio(TWILIO_SID, TWILIO_AUTH_TOKEN);
+
+    // Send SMS
+    const message = await client.messages.create({
       body: option.body,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: TWILIO_PHONE_NUMBER,
       to: option.to,
     });
 
-    console.log("SMS sent Successfully");
+    console.log("✅ SMS sent successfully:", message.sid);
   } catch (error) {
     console.log("Error While Sending Sms", error);
   }

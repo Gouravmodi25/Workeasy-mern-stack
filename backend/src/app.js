@@ -4,6 +4,7 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
+const userRouter = require("./routes/user.routes");
 
 const originOptions = ["http://localhost:5173", "http://localhost:5174"];
 
@@ -29,5 +30,8 @@ app.use(cookieParser());
 
 // for parsing application/json
 app.use(express.json({ limit: "50mb", extended: true }));
+
+// for user api route
+app.use("/api/user", userRouter);
 
 module.exports = app;
