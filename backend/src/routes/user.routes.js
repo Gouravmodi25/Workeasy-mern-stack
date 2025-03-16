@@ -10,6 +10,7 @@ const {
   forgotPassword,
   resetPasswordOtpVerification,
   resetPassword,
+  changePasswordApi,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -38,5 +39,8 @@ userRouter
 
 // for reset password
 userRouter.route("/reset-password").patch(resetPassword);
+
+// for changed password
+userRouter.route("/changed-password").patch(userAuth, changePasswordApi);
 
 module.exports = userRouter;

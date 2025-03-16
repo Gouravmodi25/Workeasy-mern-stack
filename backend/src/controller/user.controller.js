@@ -595,7 +595,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 
   await sendMail({
     to: user.email,
-    subject: "Otp For Verification",
+    subject: "Password changed successfully",
     text: resetPasswordEmailTemplate,
   });
 
@@ -643,6 +643,18 @@ const changePasswordApi = asyncHandler(async function (req, res) {
   const user = await UserModel.findById(_id).select("+password");
 
   user.password = newPassword;
+
+  await sendMail({
+    to: user.email,
+    subject: "Password changed successfully",
+    text: resetPasswordEmailTemplate,
+  });
+
+  const newUser = await UserModel.findById(user._id).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Password Reset Successfully", newUser));
 });
 
 module.exports = {
@@ -653,4 +665,5 @@ module.exports = {
   forgotPassword,
   resetPasswordOtpVerification,
   resetPassword,
+  changePasswordApi,
 };
