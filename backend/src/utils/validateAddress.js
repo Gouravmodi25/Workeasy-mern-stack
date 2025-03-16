@@ -1,29 +1,49 @@
 const validateAddress = (address) => {
-  if (!address || typeof address === "object") {
-    return "Address must be type of object  ";
+  console.log("Received address:", address); // Debugging line
+
+  const newAddress = JSON.parse(address);
+  console.log(newAddress);
+  // Check if the address is an object and not null
+  if (!newAddress || typeof newAddress !== "object") {
+    return "Address must be a valid object";
   }
 
-  const { landmark, city, state, address: addr, country } = address;
+  // Destructure fields with default empty strings to prevent undefined errors
+  const {
+    landmark = "",
+    city = "",
+    state = "",
+    address: addr = "",
+    country = "",
+  } = newAddress;
 
-  if (!landmark || typeof landmark === "string") {
+  console.log(landmark);
+  console.log(city);
+  console.log(state);
+  console.log(addr);
+  console.log(country);
+
+  if (!landmark.trim()) {
     return "Landmark must be required";
   }
 
-  if (!city || typeof city === "string") {
+  if (!city.trim()) {
     return "City must be required";
   }
 
-  if (!state || typeof state === "string") {
+  if (!state.trim()) {
     return "State must be required";
   }
 
-  if (!addr || typeof addr === "string") {
+  if (!addr.trim()) {
     return "Address must be required";
   }
 
-  if (!country || typeof country === "string") {
+  if (!country.trim()) {
     return "Country must be required";
   }
 
   return null;
 };
+
+module.exports = validateAddress;

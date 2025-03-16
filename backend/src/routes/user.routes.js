@@ -1,9 +1,12 @@
 const express = require("express");
 const userRouter = express.Router();
+const upload = require("../middleware/multer.middleware.js");
+
 const {
   signupUser,
   otpVerification,
   resendOtp,
+  completeProfileForUser,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -16,5 +19,10 @@ userRouter.route("/verify-otp").post(userAuth, otpVerification);
 
 // for resend otp route
 userRouter.route("/resend-otp").post(userAuth, resendOtp);
+
+// for complete profile route
+userRouter
+  .route("/complete-profile")
+  .post(userAuth, upload.single("avatarImage"), completeProfileForUser);
 
 module.exports = userRouter;

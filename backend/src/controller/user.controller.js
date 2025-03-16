@@ -8,7 +8,9 @@ const ApiError = require("../utils/ApiError.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const uploadOnCloudinary = require("../utils/uploadOnCloudinary.js");
 const validateAddress = require("../utils/validateAddress.js");
-
+const validateGender = require("../utils/validateGender.js");
+const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
+const fs = require("fs");
 // for generate accessToken
 
 const generateAccessToken = async (userId) => {
@@ -272,6 +274,7 @@ const resendOtp = asyncHandler(async (req, res) => {
 const completeProfileForUser = asyncHandler(async function (req, res) {
   const { gender, dob, address } = req.body;
   const { _id } = req.user;
+  console.log(dob);
 
   const { isVerified } = req.user;
 
@@ -285,37 +288,72 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
     return res.status(400).json(new ApiResponse(400, "All field are required"));
   }
 
-  const avatarImageLocalPath = req.file;
+  const [genderError, dobError, addressError] = [
+    validateGender(gender),
+    validateDateOfBirth(dob),
+    validateAddress(address),
+  ];
 
-  if (!avatarImageLocalPath) {
-    return res
-      .status(400)
-      .json(new ApiResponse(400, "Avatar Image is required"));
+  if (genderError) {
+    return res.status(400).json(new ApiResponse(400, genderError));
   }
 
-  const avatarImage = await uploadOnCloudinary(avatarImageLocalPath);
-
-  if (!avatarImage) {
-    return res
-      .status(400)
-      .json(new ApiResponse(400, "Error While! uploading image on cloudinary"));
-  }
-
-  const addressError = validateAddress(address);
   if (addressError) {
     return res.status(400).json(new ApiResponse(400, addressError));
   }
 
+  if (dobError) {
+    return res.status(400).json(new ApiResponse(400, dobError));
+  }
+
   const user = await UserModel.findOne({ _id });
+
+  if (!user) {
+    return res.status(400).json(new ApiResponse(400, "User not found"));
+  }
+
+  const avatarImageLocalPath = req?.file?.path;
+  let avatarImage = user.avatarImage;
+  console.log(avatarImageLocalPath);
+
+  if (avatarImageLocalPath) {
+    try {
+      const cloudinaryResponse = await uploadOnCloudinary(avatarImageLocalPath);
+      if (cloudinaryResponse) {
+        avatarImage = cloudinaryResponse.url;
+      } else {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, "Error While uploading image to Cloudinary")
+          );
+      }
+    } catch (error) {
+      return res.status(400).json(new ApiResponse(400, error.message));
+    }
+  } else if (!avatarImage) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Profile Image is required"));
+  }
+
+  console.log(avatarImage);
+
+  const newAddress = JSON.parse(address);
 
   user.gender = gender;
   user.dob = dob;
-  user.avatarImage = avatarImage.url;
-  user.address = address;
+  user.avatarImage = avatarImage;
+  user.address = newAddress;
 
   user.save({ validateBeforeSave: false });
 
-  return res.status(200).json("Profile Completed Successfully");
+  console.log(user.address);
+  console.log(user.avatarImage);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Profile Completed Successfully", user));
 });
 
 module.exports = {
