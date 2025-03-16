@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const addressSchema = new mongoose.Schema({
   landmark: { type: String },
@@ -140,6 +141,20 @@ userSchema.methods.generateAccessToken = function () {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
     }
   );
+};
+
+// generate reset password token
+
+userSchema.methods.generateResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  this.resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  this.resetPasswordTokenExpiry = Date.now() + 10 * (60 * 1000);
+  return resetToken;
 };
 
 // generate refresh token
