@@ -7,6 +7,7 @@ const addressSchema = new mongoose.Schema({
   city: { type: String },
   state: { type: String },
   address: { type: String },
+  country: { type: String },
 });
 
 const userSchema = new mongoose.Schema(
@@ -56,11 +57,6 @@ const userSchema = new mongoose.Schema(
     },
 
     // for profile details
-    mobileNumber: {
-      type: String,
-      unique: true,
-      sparse: true,
-    },
     gender: {
       type: String,
       enum: ["Male", "Female", "Other"],

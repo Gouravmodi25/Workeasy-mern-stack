@@ -6,6 +6,8 @@ const sendMail = require("../utils/sendEmail.js");
 const sendSms = require("../utils/sendSms.js");
 const ApiError = require("../utils/ApiError.js");
 const asyncHandler = require("../utils/asyncHandler.js");
+const uploadOnCloudinary = require("../utils/uploadOnCloudinary.js");
+const validateAddress = require("../utils/validateAddress.js");
 
 // for generate accessToken
 
@@ -221,7 +223,7 @@ const otpVerification = asyncHandler(async (req, res) => {
 // for resend otp
 
 const resendOtp = asyncHandler(async (req, res) => {
-  const { email } = req.user;
+  const { email, fullname } = req.user;
 
   const searchUser = await UserModel.findOne({ email }).select(
     "+otp +otpExpires"
@@ -234,14 +236,24 @@ const resendOtp = asyncHandler(async (req, res) => {
   searchUser.save({ validateBeforeSave: false });
 
   const EmailMessage = `
-  <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd;">
-       <h2 style="color: #4CAF50;">🔐 WorkEasy OTP Verification</h2>
-       <p>Your OTP is: <strong style="color: #ff5722; font-size: 18px;">${otp}</strong></p>
-       <p>This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>
-       <p>Thank you for using WorkEasy!</p>
-       <hr>
-       <small style="color: #777;">If you did not request this OTP, please ignore this email.</small>
-   </div>
+  <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 400px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <div style=" background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">WorkEasy OTP Verification</h2>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">Hi ${fullname},</h2>
+            <h4>Your One-Time Password (OTP) for verification is:</h4>
+            <div style="font-size: 28px; font-weight: bold; margin: 20px 0; color: #333;">${otp}</div>
+            <p>This code is valid for <strong>10 minutes minutes</strong>.</p>
+            <p>If you did not request this code, please ignore this email or <a href="{{supportLink}}" style="color: #4CAF50; text-decoration: none;">contact support</a>.</p>
+        </div>
+        <div style="border-inline:1px solid white; border-bottom:1px solid white; border-radius:8px; padding: 20px;   background-color: red; text-align: center; font-size: 12px; color: white;">
+            &copy; 2025 WorkEasy. All rights reserved.
+        </div>
+    </div>
+  </div>
+
  `;
 
   await sendMail({
@@ -257,8 +269,58 @@ const resendOtp = asyncHandler(async (req, res) => {
 
 // for complete profile
 
+const completeProfileForUser = asyncHandler(async function (req, res) {
+  const { gender, dob, address } = req.body;
+  const { _id } = req.user;
+
+  const { isVerified } = req.user;
+
+  if (!isVerified) {
+    return res
+      .status(401)
+      .json(new ApiResponse(400, "Please verify the profile with otp"));
+  }
+
+  if ([gender, dob].some((field) => String("" || field).trim() == "")) {
+    return res.status(400).json(new ApiResponse(400, "All field are required"));
+  }
+
+  const avatarImageLocalPath = req.file;
+
+  if (!avatarImageLocalPath) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Avatar Image is required"));
+  }
+
+  const avatarImage = await uploadOnCloudinary(avatarImageLocalPath);
+
+  if (!avatarImage) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Error While! uploading image on cloudinary"));
+  }
+
+  const addressError = validateAddress(address);
+  if (addressError) {
+    return res.status(400).json(new ApiResponse(400, addressError));
+  }
+
+  const user = await UserModel.findOne({ _id });
+
+  user.gender = gender;
+  user.dob = dob;
+  user.avatarImage = avatarImage.url;
+  user.address = address;
+
+  user.save({ validateBeforeSave: false });
+
+  return res.status(200).json("Profile Completed Successfully");
+});
+
 module.exports = {
   signupUser,
   otpVerification,
   resendOtp,
+  completeProfileForUser,
 };
