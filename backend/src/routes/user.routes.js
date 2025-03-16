@@ -7,6 +7,7 @@ const {
   otpVerification,
   resendOtp,
   completeProfileForUser,
+  forgotPassword,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -24,5 +25,8 @@ userRouter.route("/resend-otp").post(userAuth, resendOtp);
 userRouter
   .route("/complete-profile")
   .post(userAuth, upload.single("avatarImage"), completeProfileForUser);
+
+//forgot password
+userRouter.route("/forgot-password").post(forgotPassword);
 
 module.exports = userRouter;

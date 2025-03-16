@@ -10,7 +10,7 @@ const uploadOnCloudinary = require("../utils/uploadOnCloudinary.js");
 const validateAddress = require("../utils/validateAddress.js");
 const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
-const fs = require("fs");
+
 // for generate accessToken
 
 const generateAccessToken = async (userId) => {
@@ -356,9 +356,77 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
     .json(new ApiResponse(200, "Profile Completed Successfully", user));
 });
 
+// for forgot password api
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (email.trim() === "") {
+    return res.status(400).json(new ApiResponse(400, "Email is Required"));
+  }
+
+  if (!validator.isEmail(email)) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Invalid Email Please enter valid email"));
+  }
+
+  const user = await UserModel.findOne({ email }).select("+password");
+
+  if (!user) {
+    return res.status(400).json(new ApiResponse(400, "User not found"));
+  }
+
+  const resetPasswordToken = user.generateResetPasswordToken();
+
+  const otp = generateOtp();
+
+  user.resetPasswordToken = resetPasswordToken;
+  user.resetPasswordOtp = otp;
+  user.isResetOtpVerified = false;
+  user.resetPasswordOtpExpiry = Date.now() + 10 * 60 * 1000;
+
+  await user.save({ validateBeforeSave: false });
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 400px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <div style=" background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">WorkEasy OTP Verification</h2>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">Hi ${user.fullname},</h2>
+            <h4>Your  One-Time Password (OTP) for reset password is:</h4>
+            <div style="font-size: 28px; font-weight: bold; margin: 20px 0; color: #333;">${user.resetPasswordOtp}</div>
+            <p>This code is valid for <strong>10 minutes</strong>.</p>
+            <p>If you did not request this code, please ignore this email or <a href="{{supportLink}}" style="color: #4CAF50; text-decoration: none;">contact support</a>.</p>
+        </div>
+        <div style="border-inline:1px solid white; border-bottom:1px solid white; border-radius:8px; padding: 20px;   background-color: red; text-align: center; font-size: 12px; color: white;">
+            &copy; 2025 WorkEasy. All rights reserved.
+        </div>
+    </div>
+  </div>
+  `;
+
+  await sendMail({
+    to: user.email,
+    subject: "Otp For Verification",
+    text: message,
+  });
+
+  const options = {
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("resetPasswordToken", resetPasswordToken, options)
+    .json(new ApiResponse(200, "Successfully sent reset password otp", user));
+});
+
 module.exports = {
   signupUser,
   otpVerification,
   resendOtp,
   completeProfileForUser,
+  forgotPassword,
 };

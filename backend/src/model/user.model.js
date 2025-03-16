@@ -80,6 +80,17 @@ const userSchema = new mongoose.Schema(
     },
 
     //   for reset password token
+    resetPasswordOtp: {
+      type: String,
+    },
+    resetPasswordOtpExpiry: {
+      type: String,
+    },
+
+    isResetOtpVerified: {
+      type: Boolean,
+    },
+
     resetPasswordToken: {
       type: String,
     },
