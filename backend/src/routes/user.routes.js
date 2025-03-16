@@ -8,6 +8,8 @@ const {
   resendOtp,
   completeProfileForUser,
   forgotPassword,
+  resetPasswordOtpVerification,
+  resetPassword,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -28,5 +30,13 @@ userRouter
 
 //forgot password
 userRouter.route("/forgot-password").post(forgotPassword);
+
+// for  reset password otp verification
+userRouter
+  .route("/reset-password-otp-verification")
+  .post(resetPasswordOtpVerification);
+
+// for reset password
+userRouter.route("/reset-password").patch(resetPassword);
 
 module.exports = userRouter;

@@ -28,14 +28,13 @@ const validateDateOfBirth = (dob) => {
   console.log(age);
   //   check dob is greater than 18 or not
 
-  if (age <= 18) {
-    return "You must be at least 18 year old";
+  if (age < 18) {
+    return "You must be at least 18 years old";
   }
 
   if (age > 120) {
     return "Invalid Date of Birth, age seems unrealistic";
   }
-
   return null;
 };
 

@@ -10,6 +10,8 @@ const uploadOnCloudinary = require("../utils/uploadOnCloudinary.js");
 const validateAddress = require("../utils/validateAddress.js");
 const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
+const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
+const fs = require("fs");
 
 // for generate accessToken
 
@@ -217,6 +219,51 @@ const otpVerification = asyncHandler(async (req, res) => {
     "-password"
   );
 
+  // message
+  const message = `
+    <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+        <div style="background-color: #007bff; color: #ffffff; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">Welcome to WorkEasy!</h1>
+        </div>
+        <div style="padding: 20px;">
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                Hi <strong>${verifiedUser.fullname}</strong>,
+            </p>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                Thank you for registering with <strong>WorkEasy</strong>! Your account has been successfully created.
+            </p>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                Here are your details:
+            </p>
+            <ul style="font-size: 16px; color: #333333; line-height: 1.5;">
+                <li><strong>Full Name:</strong> ${verifiedUser.fullname}</li>
+                <li><strong>Email:</strong>${verifiedUser.email}</li>
+            </ul>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                You can now log in and start exploring our platform.
+            </p>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                If you have any questions or need assistance, feel free to reach out to our support team.
+            </p>
+            <p style="font-size: 16px; color: #007bff; line-height: 1.5;">
+                Best Regards,<br>
+                The WorkEasy Team
+            </p>
+        </div>
+        <div style="background-color: #f4f4f4; color: #777777; padding: 10px; text-align: center;">
+            <p style="font-size: 12px;">&copy; 2025 WorkEasy. All rights reserved.</p>
+        </div>
+    </div>
+</div>
+  `;
+
+  await sendMail({
+    to: verifiedUser.email,
+    subject: "Welcome to WorkEasy",
+    text: message,
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Successfully Verified Otp", verifiedUser));
@@ -247,7 +294,7 @@ const resendOtp = asyncHandler(async (req, res) => {
             <h2 style="margin: 0;">Hi ${fullname},</h2>
             <h4>Your One-Time Password (OTP) for verification is:</h4>
             <div style="font-size: 28px; font-weight: bold; margin: 20px 0; color: #333;">${otp}</div>
-            <p>This code is valid for <strong>10 minutes minutes</strong>.</p>
+            <p>This code is valid for <strong>10 minutes</strong>.</p>
             <p>If you did not request this code, please ignore this email or <a href="{{supportLink}}" style="color: #4CAF50; text-decoration: none;">contact support</a>.</p>
         </div>
         <div style="border-inline:1px solid white; border-bottom:1px solid white; border-radius:8px; padding: 20px;   background-color: red; text-align: center; font-size: 12px; color: white;">
@@ -319,6 +366,7 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
   if (avatarImageLocalPath) {
     try {
       const cloudinaryResponse = await uploadOnCloudinary(avatarImageLocalPath);
+      fs.unlinkSync(avatarImageLocalPath);
       if (cloudinaryResponse) {
         avatarImage = cloudinaryResponse.url;
       } else {
@@ -348,6 +396,33 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
 
   user.save({ validateBeforeSave: false });
 
+  // for email
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; background-color: #1a1a1a; margin: 0; padding: 0; color: #f2f2f2;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #333; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);">
+        <div style="padding: 20px; text-align: center; background-color: #555;">
+            <h2 style="margin: 0; font-size: 24px; color: #f2f2f2;">🎉 Profile Completed Successfully!</h2>
+        </div>
+        <div style="padding: 20px; color: #dcdcdc;">
+            <p style="font-size: 16px; margin: 0;">Hi <strong>{{fullname}}</strong>,</p>
+            <p style="font-size: 16px; margin: 8px 0;">Your profile has been successfully completed on <strong>WorkEasy</strong>.</p>
+            <p style="font-size: 16px; margin: 8px 0;">You are now ready to explore all the features and services on our platform. We are thrilled to have you with us!</p>
+            <p style="font-size: 16px; margin: 8px 0;">If you need any assistance, feel free to reach out to our support team.</p>
+            <p style="font-size: 16px; margin: 8px 0;">Best Regards,<br>The WorkEasy Team</p>
+        </div>
+        <div style="background-color: #444; padding: 10px; text-align: center;">
+            <p style="font-size: 12px; color: #aaa;">&copy; 2025 WorkEasy. All rights reserved.</p>
+        </div>
+    </div>
+</div>
+  `;
+
+  await sendMail({
+    to: user.email,
+    subject: "Otp For Verification",
+    text: message,
+  });
   console.log(user.address);
   console.log(user.avatarImage);
 
@@ -423,10 +498,159 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Successfully sent reset password otp", user));
 });
 
+// api for reset password otp verification
+
+const resetPasswordOtpVerification = asyncHandler(async (req, res) => {
+  const resetPasswordToken = req?.cookies?.resetPasswordToken;
+
+  const { otp } = req.body;
+
+  if (!otp) {
+    return res.status(400).json(new ApiResponse(400, "Otp is required"));
+  }
+
+  console.log(resetPasswordToken);
+
+  const user = await UserModel.findOne({
+    resetPasswordToken,
+    resetPasswordTokenExpiry: { $gt: Date.now() },
+  });
+
+  console.log(user);
+
+  if (!user) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Reset Token"));
+  }
+
+  if (user.resetPasswordOtp !== otp) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Otp"));
+  }
+
+  if (user.resetPasswordOtpExpiry < Date.now()) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "OTP has expired. Request a new one."));
+  }
+
+  // after verification
+  user.isResetOtpVerified = true;
+  user.resetPasswordOtp = null;
+  user.resetPasswordOtpExpiry = null;
+
+  await user.save({ validateBeforeSave: false });
+
+  const verifiedUser = await UserModel.findById(user._id).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Otp Verified", verifiedUser));
+});
+
+// for reset password
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { newPassword, confirmPassword } = req.body;
+
+  if (
+    [newPassword, confirmPassword].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are Required"));
+  }
+
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "Password must be at least 8 characters long")
+      );
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Both Password should be same"));
+  }
+
+  const resetPasswordToken = req?.cookies?.resetPasswordToken;
+
+  const user = await UserModel.findOne({
+    resetPasswordToken,
+    resetPasswordTokenExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Reset Token"));
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = null;
+  user.resetPasswordTokenExpiry = null;
+  user.isResetOtpVerified = null;
+
+  await user.save({ validateBeforeSave: false });
+
+  await sendMail({
+    to: user.email,
+    subject: "Otp For Verification",
+    text: resetPasswordEmailTemplate,
+  });
+
+  const newUser = await UserModel.findById(user._id).select(
+    "-password,-isResetOtpVerified"
+  );
+
+  return res
+    .status(200)
+    .clearCookie("resetPasswordToken")
+    .json(new ApiResponse(200, "Password Reset Successfully", newUser));
+});
+
+// change password api
+
+const changePasswordApi = asyncHandler(async function (req, res) {
+  const { _id } = req.user;
+
+  const { newPassword, confirmPassword } = req.body;
+
+  if (
+    [newPassword, confirmPassword].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are Required"));
+  }
+
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "Password must be at least 8 characters long")
+      );
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Both Password should be same"));
+  }
+
+  const user = await UserModel.findById(_id).select("+password");
+
+  user.password = newPassword;
+});
+
 module.exports = {
   signupUser,
   otpVerification,
   resendOtp,
   completeProfileForUser,
   forgotPassword,
+  resetPasswordOtpVerification,
+  resetPassword,
 };
