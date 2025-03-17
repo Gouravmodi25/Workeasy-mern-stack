@@ -11,6 +11,7 @@ const validateAddress = require("../utils/validateAddress.js");
 const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
 const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
+const otpVerificationEmailTemplate = require("../utils/otpVerificationEmailTemplate");
 const fs = require("fs");
 
 // for generate accessToken
@@ -147,24 +148,11 @@ const signupUser = asyncHandler(async (req, res) => {
   user.accessToken = accessToken;
   await user.save({ validateBeforeSave: false });
 
-  //   for email
-
-  const EmailMessage = `
-     <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd;">
-          <h2 style="color: #4CAF50;">🔐 WorkEasy OTP Verification</h2>
-          <p>Your OTP is: <strong style="color: #ff5722; font-size: 18px;">${otp}</strong></p>
-          <p>This OTP is valid for <strong>10 minutes</strong>. Do not share it with anyone.</p>
-          <p>Thank you for using WorkEasy!</p>
-          <hr>
-          <small style="color: #777;">If you did not request this OTP, please ignore this email.</small>
-      </div>
-    `;
-
   // for sendEmail
   await sendMail({
     to: user.email,
     subject: "Otp For Verification",
-    text: EmailMessage,
+    text: otpVerificationEmailTemplate,
   });
 
   if (!createdUser) {
@@ -596,7 +584,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   await sendMail({
     to: user.email,
     subject: "Password changed successfully",
-    text: resetPasswordEmailTemplate,
+    text: resetPasswordEmailTemplate(user.fullname),
   });
 
   const newUser = await UserModel.findById(user._id).select(
@@ -642,12 +630,22 @@ const changePasswordApi = asyncHandler(async function (req, res) {
 
   const user = await UserModel.findById(_id).select("+password");
 
+  const isSamePassword = user.isSamePassword(newPassword);
+
+  if (!isSamePassword) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "New Password is not same as previous password")
+      );
+  }
+
   user.password = newPassword;
 
   await sendMail({
     to: user.email,
     subject: "Password changed successfully",
-    text: resetPasswordEmailTemplate,
+    text: resetPasswordEmailTemplate(user.fullname),
   });
 
   const newUser = await UserModel.findById(user._id).select("-password");
@@ -655,6 +653,65 @@ const changePasswordApi = asyncHandler(async function (req, res) {
   return res
     .status(200)
     .json(new ApiResponse(200, "Password Reset Successfully", newUser));
+});
+
+// for user login
+
+const loginUser = asyncHandler(async (req, res) => {
+  const { identifier, password } = req.body;
+
+  if (
+    [identifier, password].some((field) => String("" || field).trim() == "")
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "ALl fields are required"));
+  }
+
+  const user = await UserModel.findOne({
+    $or: [{ email: identifier }, { username: identifier }],
+  }).select("+password");
+
+  if (!user) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Credentials"));
+  }
+
+  const isCorrectPassword = user.isCorrectPassword(password);
+
+  if (!isCorrectPassword) {
+    return res.status(400).json(new ApiResponse(400, "Incorrect Password"));
+  }
+
+  const accessToken = generateAccessToken(user._id);
+  console.log(accessToken);
+
+  const options = {
+    secure: true,
+  };
+
+  const otp = generateOtp();
+
+  user.otp = otp;
+  user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  user.accessToken = accessToken;
+  await user.save({ validateBeforeSave: false });
+
+  // mail send
+
+  await sendMail({
+    to: user.email,
+    subject: "Otp for Verification",
+    text: otpVerificationEmailTemplate(user.fullname, user.otp),
+  });
+
+  const newUser = await UserModel.findById(user._id).select(
+    "-password,+otp,+otpExpires"
+  );
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .json(new ApiResponse(200, "Login Account Successfully", newUser));
 });
 
 module.exports = {
@@ -666,4 +723,5 @@ module.exports = {
   resetPasswordOtpVerification,
   resetPassword,
   changePasswordApi,
+  loginUser,
 };

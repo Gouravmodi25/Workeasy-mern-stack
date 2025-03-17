@@ -11,6 +11,7 @@ const {
   resetPasswordOtpVerification,
   resetPassword,
   changePasswordApi,
+  loginUser,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -42,5 +43,8 @@ userRouter.route("/reset-password").patch(resetPassword);
 
 // for changed password
 userRouter.route("/changed-password").patch(userAuth, changePasswordApi);
+
+// login route
+userRouter.route("/login").post(loginUser);
 
 module.exports = userRouter;

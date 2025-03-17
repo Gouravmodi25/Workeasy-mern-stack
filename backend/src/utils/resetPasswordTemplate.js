@@ -1,4 +1,5 @@
-const message = `
+const message = (fullname,) => {
+  return `
     <div style="font-family: Arial, sans-serif; background-color: #121212; margin: 0; padding: 0; color: #e0e0e0;">
     <div style="max-width: 600px; margin: 20px auto; background-color: #1e1e1e; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
         <!-- Header -->
@@ -7,7 +8,7 @@ const message = `
         </div>
         <!-- Body -->
         <div style="padding: 20px; color: #e0e0e0;">
-            <p style="font-size: 16px; margin: 0;">Hi <strong>{{fullname}}</strong>,</p>
+            <p style="font-size: 16px; margin: 0;">Hi <strong>${fullname}</strong>,</p>
             <p style="font-size: 16px; margin: 8px 0;">
                 Your password has been successfully changed on <strong>WorkEasy</strong>.
             </p>
@@ -27,5 +28,6 @@ const message = `
 </div>
 
 `;
+};
 
 module.exports = message;
