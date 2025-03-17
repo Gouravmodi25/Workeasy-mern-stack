@@ -152,7 +152,7 @@ const signupUser = asyncHandler(async (req, res) => {
   await sendMail({
     to: user.email,
     subject: "Otp For Verification",
-    text: otpVerificationEmailTemplate,
+    text: otpVerificationEmailTemplate(user.fullname, user.otp),
   });
 
   if (!createdUser) {
