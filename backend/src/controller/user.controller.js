@@ -239,33 +239,12 @@ const resendOtp = asyncHandler(async (req, res) => {
 
   searchUser.otp = otp;
   searchUser.otpExpires = Date.now() + 10 * 60 * 1000;
-  searchUser.save({ validateBeforeSave: false });
-
-  const EmailMessage = `
-  <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
-    <div style="max-width: 400px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
-        <div style=" background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
-            <h2 style="margin: 0;">WorkEasy OTP Verification</h2>
-        </div>
-        <div style="padding: 20px; text-align: center;">
-            <h2 style="margin: 0;">Hi ${fullname},</h2>
-            <h4>Your One-Time Password (OTP) for verification is:</h4>
-            <div style="font-size: 28px; font-weight: bold; margin: 20px 0; color: #333;">${otp}</div>
-            <p>This code is valid for <strong>10 minutes</strong>.</p>
-            <p>If you did not request this code, please ignore this email or <a href="{{supportLink}}" style="color: #4CAF50; text-decoration: none;">contact support</a>.</p>
-        </div>
-        <div style="border-inline:1px solid white; border-bottom:1px solid white; border-radius:8px; padding: 20px;   background-color: red; text-align: center; font-size: 12px; color: white;">
-            &copy; 2025 WorkEasy. All rights reserved.
-        </div>
-    </div>
-  </div>
-
- `;
+  await searchUser.save({ validateBeforeSave: false });
 
   await sendMail({
     to: searchUser.email,
     subject: "Otp For Verification",
-    text: EmailMessage,
+    text: otpVerificationEmailTemplate(searchUser.fullname, otp),
   });
 
   return res
@@ -557,7 +536,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 
   const newUser = await UserModel.findById(user._id).select(
-    "-password,-isResetOtpVerified"
+    "-password -isResetOtpVerified"
   );
 
   const options = {
@@ -678,7 +657,7 @@ const loginUser = asyncHandler(async (req, res) => {
   });
 
   const newUser = await UserModel.findById(user._id).select(
-    "-password,+otp,+otpExpires"
+    "-password +otp +otpExpires"
   );
 
   return res
