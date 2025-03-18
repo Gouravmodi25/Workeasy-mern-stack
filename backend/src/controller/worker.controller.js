@@ -3,12 +3,12 @@ const ApiError = require("../utils/ApiError.js");
 const uploadOnCloudinary = require("../utils/uploadOnCloudinary.js");
 const deleteOnCloudinary = require("../utils/deleteOnCloudinary.js");
 const generateOtp = require("../utils/generateOtp.js");
-const sendEmail = require("../utils/sendEmail.js");
 const asyncHandler = require("../utils/asyncHandler.js");
 const WorkerModel = require("../model/worker.model.js");
 const validator = require("validator");
 const otpVerificationEmailTemplate = require("../utils/otpVerificationEmailTemplate.js");
 const afterOtpVerificationEmailTemplate = require("../utils/afterOtpVerificationEmailTemplate.js");
+const sendMail = require("../utils/sendEmail.js");
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -110,9 +110,9 @@ const signupWorker = asyncHandler(async function (req, res) {
       .json(new ApiResponse(400, "Error while register worker"));
   }
 
-  const worker = await WorkerModel.findById(createWorker._id).select([
-    "-password -age",
-  ]);
+  const worker = await WorkerModel.findById(createWorker._id).select(
+    "-password -age"
+  );
 
   //   for generating otp
 
@@ -123,12 +123,12 @@ const signupWorker = asyncHandler(async function (req, res) {
   const accessToken = await generateAccessToken(worker._id);
 
   worker.otp = otp;
-  worker.otpExpires = Date.now() + 10 * (60 * 3600);
+  worker.otpExpires = Date.now() + 10 * 60 * 1000;
   worker.accessToken = accessToken;
 
   await worker.save({ validateBeforeSave: false });
 
-  await sendEmail({
+  await sendMail({
     to: worker.email,
     subject: "Otp For Verification",
     text: otpVerificationEmailTemplate(worker.fullname, worker.otp),
@@ -149,11 +149,13 @@ const signupWorker = asyncHandler(async function (req, res) {
 const otpVerification = asyncHandler(async (req, res) => {
   const { otp } = req.body;
 
-  const { worker } = req;
+  const { _id } = req?.worker;
 
-  const searchWorker = await WorkerModel.findOne({
-    email,
-  }).select("+otp,+otpExpires");
+  const searchWorker = await WorkerModel.findById(_id).select(
+    "+otp +otpExpires"
+  );
+
+  console.log(searchWorker);
 
   if (!searchWorker) {
     return res.status(400).json(new ApiResponse(400, "Worker not found"));
@@ -164,6 +166,12 @@ const otpVerification = asyncHandler(async (req, res) => {
   }
 
   if (searchWorker.otpExpires < Date.now()) {
+    // once otp is expires then otp will be null
+    searchWorker.isVerified = true;
+    searchWorker.otp = null;
+    searchWorker.otpExpires = null;
+
+    await searchWorker.save({ validateBeforeSave: false });
     return res
       .status(400)
       .json(new ApiResponse(400, "OTP has expired. Request a new one."));
@@ -195,7 +203,36 @@ const otpVerification = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Successfully Verified Otp", verifiedWorker));
 });
 
+// resend otp if otp is expires
+
+const resendOtp = asyncHandler(async (req, res) => {
+  const { email, fullname } = req?.worker;
+
+  const searchWorker = await WorkerModel.findOne({ email }).select(
+    "+otp +otpExpires"
+  );
+
+  const otp = generateOtp();
+
+  searchWorker.otp = otp;
+  searchWorker.otpExpires = Date.now() + 10 * (60 * 1000);
+  await searchWorker.save({ validateBeforeSave: false });
+
+  await sendMail({
+    to: searchWorker.email,
+    subject: "Otp For Verification",
+    text: otpVerificationEmailTemplate(searchWorker.fullname, otp),
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, "Successfully resend otp on email", searchWorker)
+    );
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
+  resendOtp,
 };

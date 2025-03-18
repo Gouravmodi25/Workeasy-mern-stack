@@ -4,59 +4,56 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("../utils/asyncHandler");
 
 const workerAuth = asyncHandler(async function (req, res, next) {
-  const token = req?.cookies?.accessToken;
-  console.log(token);
+  // Retrieve token from cookies or authorization header
+  const token =
+    req?.cookies?.accessToken ||
+    (req?.headers["authorization"]?.startsWith("Bearer ")
+      ? req.headers["authorization"].split(" ")[1]
+      : null);
 
   if (!token) {
     return res
       .status(401)
-      .json(new ApiResponse(401, "Not Authorized Login Again"));
+      .json(new ApiResponse(401, "Not Authorized. Please log in again."));
   }
 
   try {
-    let decodedToken;
+    // Verify the token
+    const decodedToken = await jwt.verify(
+      token,
+      process.env.ACCESS_TOKEN_SECRET
+    );
+    console.log("Decoded Token ID:", decodedToken.id);
 
-    try {
-      decodedToken = await jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    } catch (error) {
+    // Find the worker using the decoded ID
+    const loggedWorker = await WorkerModel.findById(decodedToken.id).select(
+      "-password"
+    );
+
+    if (!loggedWorker) {
       return res
         .status(401)
-        .json(
-          new ApiResponse(
-            401,
-            "Invalid or expired token. Please log in again." || error?.message
-          )
-        );
+        .json(new ApiResponse(401, "Worker not found. Please log in again."));
     }
 
-    console.log(decodedToken._id);
+    console.log("Logged Worker:", loggedWorker);
 
-    let loggedWorker;
-
-    try {
-      loggedWorker = await WorkerModel.findById(decodedToken.id).select(
-        "-password"
-      );
-      console.log("loggedUser", loggedUser);
-    } catch (error) {
-      return res
-        .status(401)
-        .json(
-          new ApiResponse(
-            401,
-            "Error verifying token data. Please log in again." || error.message
-          )
-        );
-    }
-
+    // Attach the worker to the request object
     req.worker = loggedWorker;
     next();
   } catch (error) {
+    console.error("Token verification failed:", error.message);
+
+    // Handle expired token explicitly
+    if (error.name === "TokenExpiredError") {
+      return res
+        .status(401)
+        .json(new ApiResponse(401, "Token expired. Please log in again."));
+    }
+
     return res
       .status(401)
-      .json(
-        new ApiResponse(401, "Not Authorized Login Again" || error.message)
-      );
+      .json(new ApiResponse(401, "Invalid token. Please log in again."));
   }
 });
 
