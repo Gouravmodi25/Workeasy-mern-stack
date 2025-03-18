@@ -330,7 +330,7 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
   user.avatarImage = avatarImage;
   user.address = newAddress;
 
-  user.save({ validateBeforeSave: false });
+  await user.save({ validateBeforeSave: false });
 
   // for email
 
@@ -356,7 +356,7 @@ const completeProfileForUser = asyncHandler(async function (req, res) {
 
   await sendMail({
     to: user.email,
-    subject: "Otp For Verification",
+    subject: "Profile Completed Successfully",
     text: message,
   });
   console.log(user.address);
