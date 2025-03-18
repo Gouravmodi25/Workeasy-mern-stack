@@ -9,6 +9,9 @@ const validator = require("validator");
 const otpVerificationEmailTemplate = require("../utils/otpVerificationEmailTemplate.js");
 const afterOtpVerificationEmailTemplate = require("../utils/afterOtpVerificationEmailTemplate.js");
 const sendMail = require("../utils/sendEmail.js");
+const validateGender = require("../utils/validateGender.js");
+const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
+const validateAddress = require("../utils/validateAddress.js");
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -206,7 +209,7 @@ const otpVerification = asyncHandler(async (req, res) => {
 // resend otp if otp is expires
 
 const resendOtp = asyncHandler(async (req, res) => {
-  const { email, fullname } = req?.worker;
+  const { email } = req?.worker;
 
   const searchWorker = await WorkerModel.findOne({ email }).select(
     "+otp +otpExpires"
@@ -231,8 +234,164 @@ const resendOtp = asyncHandler(async (req, res) => {
     );
 });
 
+// complete profile details
+
+const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
+  const {
+    gender,
+    dob,
+    skill,
+    experience,
+    charges,
+    availability,
+    visitationFees,
+    address,
+  } = req.body;
+
+  if (!isVerified) {
+    return res
+      .status(401)
+      .json(new ApiResponse(400, "Please verify the profile with otp"));
+  }
+
+  const { _id } = req.worker;
+
+  if (
+    [
+      gender,
+      dob,
+      skill,
+      experience,
+      charges,
+      visitationFees,
+      availability,
+    ].some((field) => String("" || field).trim() == "")
+  ) {
+    return res.status(400).json(new ApiResponse(400, "All field are required"));
+  }
+
+  const validateAvailability = (availability) => {
+    const validAvailability = ["Available", "Unavailable", "On Leave"];
+
+    if (!availability || !validAvailability.includes(availability)) {
+      return "Availability must be Available,Unavailable and On Leave";
+    }
+
+    return null;
+  };
+
+  const [genderError, dobError, addressError, availabilityError] = [
+    validateGender(gender),
+    validateDateOfBirth(dob),
+    validateAddress(address),
+    validateAvailability(availability),
+  ];
+
+  if (availabilityError) {
+    return res.status(400).json(new ApiResponse(400, availabilityError));
+  }
+
+  if (genderError) {
+    return res.status(400).json(new ApiResponse(400, genderError));
+  }
+
+  if (addressError) {
+    return res.status(400).json(new ApiResponse(400, addressError));
+  }
+
+  if (dobError) {
+    return res.status(400).json(new ApiResponse(400, dobError));
+  }
+
+  const worker = await WorkerModel.findOne({ _id });
+
+  //   for avatar image
+
+  const avatarImageLocalPath = req?.file?.path;
+  let avatarImage = worker.avatarImage;
+  console.log(avatarImageLocalPath);
+
+  if (avatarImageLocalPath) {
+    try {
+      const cloudinaryResponse = await uploadOnCloudinary(avatarImageLocalPath);
+      fs.unlinkSync(avatarImageLocalPath);
+      if (cloudinaryResponse) {
+        avatarImage = cloudinaryResponse.url;
+      } else {
+        return res
+          .status(400)
+          .json(
+            new ApiResponse(400, "Error While uploading image to Cloudinary")
+          );
+      }
+    } catch (error) {
+      return res.status(400).json(new ApiResponse(400, error.message));
+    }
+  } else if (!avatarImage) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Profile Image is required"));
+  }
+
+  console.log(avatarImage);
+
+  const newAddress = JSON.parse(address);
+
+  worker.gender = gender;
+  worker.dob = dob;
+  worker.avatarImage = avatarImage;
+  worker.address = newAddress;
+  worker.availability = availability;
+  worker.charges = charges;
+  worker.visitationFees = visitationFees;
+  worker.skill = skill;
+  worker.experience = experience;
+
+  await worker.save({ validateBeforeSave: false });
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #121212; color: #e0e0e0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #1e1e1e; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #333333; padding: 20px; text-align: center;">
+            <h2 style="margin: 0; color: #ffffff;">Profile Completed! 🎉</h2>
+        </div>
+        <div style="padding: 20px;">
+            <p>Hi <strong>${worker.fullname}</strong>,</p>
+            <p>Your profile on <strong>WorkEasy</strong> is now complete and visible to clients. You are now eligible to be hired directly for jobs that match your skills.</p>
+            <p>To boost your chances of getting hired:</p>
+            <ul style="padding-left: 20px; margin: 10px 0;">
+                <li>Keep your profile updated regularly.</li>
+                <li>Set your availability to active.</li>
+                <li>Respond quickly to any offers.</li>
+            </ul>
+            <p>Visit your dashboard to manage your profile and view new opportunities:</p>
+            <p><a href="#" style="color: #1e90ff; text-decoration: none;">Go to Dashboard</a></p>
+            <p>If you need assistance, feel free to contact our support team.</p>
+        </div>
+        <div style="background-color: #333333; padding: 15px; text-align: center; font-size: 12px; color: #888888;">
+            © 2025 WorkEasy. All rights reserved.
+        </div>
+    </div>
+</div>
+  `;
+
+  await sendMail({
+    to: worker.email,
+    subject: "Profile Completed Successfully",
+    text: message,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Profile Completed Successfully", worker));
+});
+
+
+
+
 module.exports = {
   signupWorker,
   otpVerification,
   resendOtp,
+  completeProfileDetailsWorker,
 };
