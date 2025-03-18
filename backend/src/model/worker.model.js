@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
 const { Schema } = mongoose;
 
@@ -13,7 +16,6 @@ const addressSchema = new mongoose.Schema({
 
 const workerSchema = new Schema({
   // necessary fields
-
   email: {
     type: String,
     required: true,
@@ -75,7 +77,7 @@ const workerSchema = new Schema({
     type: Number,
   },
   availability: {
-    type: Boolean,
+    type: String,
     default: "Available",
     enum: ["Available", "Unavailable", "On Leave"],
   },
