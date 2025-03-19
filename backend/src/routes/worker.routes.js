@@ -7,6 +7,9 @@ const {
   forgotPasswordWorker,
   resetPasswordOtpVerification,
   resetPassword,
+  loginWorker,
+  loginOtpVerification,
+  logoutWorker,
 } = require("../controller/worker.controller.js");
 const upload = require("../middleware/multer.middleware.js");
 const workerRouter = express.Router();
@@ -42,5 +45,19 @@ workerRouter
 // for reset password
 
 workerRouter.route("/reset-password").patch(resetPassword);
+
+// login worker route
+
+workerRouter.route("/login").post(loginWorker);
+
+// login otp verification
+
+workerRouter
+  .route("/login-otp-verification")
+  .post(workerAuth, loginOtpVerification);
+
+// logout worker
+
+workerRouter.route("/logout").post(workerAuth, logoutWorker);
 
 module.exports = workerRouter;
