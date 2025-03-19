@@ -12,7 +12,7 @@ const sendMail = require("../utils/sendEmail.js");
 const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
 const validateAddress = require("../utils/validateAddress.js");
-const fs = require("fs");
+const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -392,9 +392,201 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Profile Completed Successfully", worker));
 });
 
+// if worker forgot password
+
+const forgotPasswordWorker = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (email.trim() === "") {
+    return res.status(400).json(new ApiResponse(400, "Email is Required"));
+  }
+
+  if (!validator.isEmail(email)) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Invalid Email Please enter valid email"));
+  }
+
+  const worker = await WorkerModel.findOne({ email }).select("+password");
+
+  if (!worker) {
+    return res.status(400).json(new ApiResponse(400, "User not found"));
+  }
+
+  const resetPasswordToken = worker.generateResetPasswordToken();
+
+  const otp = generateOtp();
+
+  worker.resetPasswordToken = resetPasswordToken;
+  worker.resetPasswordOtp = otp;
+  worker.isResetOtpVerified = false;
+  worker.resetPasswordOtpExpiry = Date.now() + 10 * 60 * 1000;
+
+  await worker.save({ validateBeforeSave: false });
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 400px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden;">
+        <div style=" background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">WorkEasy OTP Verification</h2>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <h2 style="margin: 0;">Hi ${worker.fullname},</h2>
+            <h4>Your  One-Time Password (OTP) for reset password is:</h4>
+            <div style="font-size: 28px; font-weight: bold; margin: 20px 0; color: #333;">${worker.resetPasswordOtp}</div>
+            <p>This code is valid for <strong>10 minutes</strong>.</p>
+            <p>If you did not request this code, please ignore this email or <a href="{{supportLink}}" style="color: #4CAF50; text-decoration: none;">contact support</a>.</p>
+        </div>
+        <div style="border-inline:1px solid white; border-bottom:1px solid white; border-radius:8px; padding: 20px;   background-color: red; text-align: center; font-size: 12px; color: white;">
+            &copy; 2025 WorkEasy. All rights reserved.
+        </div>
+    </div>
+  </div>
+  `;
+
+  await sendMail({
+    to: worker.email,
+    subject: "Otp For Verification",
+    text: message,
+  });
+
+  const options = {
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("resetPasswordToken", resetPasswordToken, options)
+    .json(new ApiResponse(200, "Successfully sent reset password otp", worker));
+});
+
+// reset password otp verification api
+
+const resetPasswordOtpVerification = asyncHandler(async (req, res) => {
+  const resetPasswordToken = req?.cookies?.resetPasswordToken;
+
+  const { otp } = req.body;
+
+  if (!otp) {
+    return res.status(400).json(new ApiResponse(400, "Otp is required"));
+  }
+
+  console.log(resetPasswordToken);
+
+  const worker = await WorkerModel.findOne({
+    resetPasswordToken,
+    resetPasswordTokenExpiry: { $gt: Date.now() },
+  });
+
+  console.log(worker);
+
+  if (!worker) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Reset Token"));
+  }
+
+  console.log(worker.resetPasswordOtp);
+
+  if (worker.resetPasswordOtp !== otp) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Otp"));
+  }
+
+  if (worker.resetPasswordOtpExpiry < Date.now()) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "OTP has expired. Request a new one."));
+  }
+
+  // after verification
+  worker.isResetOtpVerified = true;
+  worker.resetPasswordOtp = null;
+  worker.resetPasswordOtpExpiry = null;
+
+  await worker.save({ validateBeforeSave: false });
+
+  const verifiedWorker = await WorkerModel.findById(worker._id).select(
+    "-password"
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Otp Verified", verifiedWorker));
+});
+
+// reset password for worker
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { newPassword, confirmPassword } = req.body;
+
+  if (
+    [newPassword, confirmPassword].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are Required"));
+  }
+
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "Password must be at least 8 characters long")
+      );
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Both Password should be same"));
+  }
+
+  const resetPasswordToken = req?.cookies?.resetPasswordToken;
+
+  const worker = await WorkerModel.findOne({
+    resetPasswordToken,
+    resetPasswordTokenExpiry: { $gt: Date.now() },
+  });
+
+  if (!worker) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Reset Token"));
+  }
+
+  worker.password = newPassword;
+  worker.resetPasswordToken = null;
+  worker.resetPasswordTokenExpiry = null;
+  worker.isResetOtpVerified = null;
+
+  await worker.save({ validateBeforeSave: false });
+
+  await sendMail({
+    to: worker.email,
+    subject: "Password changed successfully",
+    text: resetPasswordEmailTemplate(worker.fullname),
+  });
+
+  const newWorker = await WorkerModel.findById(worker._id).select(
+    "-password -isResetOtpVerified"
+  );
+
+  const options = {
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("resetPasswordToken", options)
+    .json(new ApiResponse(200, "Password Reset Successfully", newWorker));
+});
+
+// login for worker
+
 module.exports = {
   signupWorker,
   otpVerification,
   resendOtp,
   completeProfileDetailsWorker,
+  forgotPasswordWorker,
+  resetPasswordOtpVerification,
+  resetPassword,
 };
