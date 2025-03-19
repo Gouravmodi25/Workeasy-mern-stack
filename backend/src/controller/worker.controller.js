@@ -593,7 +593,7 @@ const loginWorker = asyncHandler(async (req, res) => {
   }
 
   const worker = await WorkerModel.findOne({
-    $or: [{ email: identifier }, { phoneNumber: identifier }],
+    $or: [{ email: identifier }, { phoneNumber: `+91${identifier}` }],
   }).select("+password");
 
   if (!worker) {
@@ -733,7 +733,7 @@ const logoutWorker = asyncHandler(async (req, res) => {
   const { worker } = req;
 
   const loggedInWorker = await WorkerModel.findByIdAndUpdate(
-    user._id,
+    worker._id,
     {
       $unset: {
         accessToken: 1,
