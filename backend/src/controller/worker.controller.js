@@ -581,6 +581,64 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 // login for worker
 
+const loginWorker = asyncHandler(async (req, res) => {
+  const { identifier, password } = req.body;
+
+  if (
+    [identifier, password].some((field) => String("" || field).trim() == "")
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "ALl fields are required"));
+  }
+
+  const worker = await WorkerModel.findOne({
+    $or: [{ email: identifier }, { phoneNumber: identifier }],
+  }).select("+password");
+
+  if (!worker) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Credentials"));
+  }
+
+  const isCorrectPassword = worker.isCorrectPassword(password);
+
+  if (!isCorrectPassword) {
+    return res.status(400).json(new ApiResponse(400, "Incorrect Password"));
+  }
+
+  const accessToken = await generateAccessToken(worker._id);
+  console.log(accessToken);
+
+  const options = {
+    secure: true,
+  };
+
+  const otp = generateOtp();
+
+  worker.otp = otp;
+  worker.isVerified = false;
+  worker.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  worker.accessToken = accessToken;
+  await worker.save({ validateBeforeSave: false });
+
+  // mail send
+
+  await sendMail({
+    to: worker.email,
+    subject: "Otp for Verification",
+    text: otpVerificationEmailTemplate(worker.fullname, worker.otp),
+  });
+
+  const newWorker = await WorkerModel.findById(worker._id).select(
+    "-password +otp +otpExpires"
+  );
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .json(new ApiResponse(200, "Login Account Successfully", newWorker));
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -589,4 +647,5 @@ module.exports = {
   forgotPasswordWorker,
   resetPasswordOtpVerification,
   resetPassword,
+  loginWorker,
 };
