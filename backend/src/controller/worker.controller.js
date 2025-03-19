@@ -639,6 +639,94 @@ const loginWorker = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Login Account Successfully", newWorker));
 });
 
+// after login verification
+
+const loginOtpVerification = asyncHandler(async (req, res) => {
+  const { email } = req?.worker;
+  console.log(email);
+
+  const { otp } = req.body;
+  console.log(otp);
+
+  //Search the user which are signup
+  const searchWorker = await WorkerModel.findOne({
+    email,
+  }).select("+otp +otpExpires");
+
+  if (!searchWorker) {
+    return res.status(400).json(new ApiResponse(400, "User  not found"));
+  }
+
+  console.log("searchWorker", searchWorker.otp);
+
+  if (searchWorker.otp !== otp) {
+    return res.status(400).json(new ApiResponse(400, "Invalid Otp"));
+  }
+
+  if (searchWorker.otpExpires < Date.now()) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "OTP has expired. Request a new one."));
+  }
+
+  // after otp verification
+  searchWorker.isVerified = true;
+  searchWorker.otp = null;
+  searchWorker.otpExpires = null;
+
+  await searchWorker.save({ validateBeforeSave: false });
+
+  const verifiedWorker = await WorkerModel.findById(searchWorker._id).select(
+    "-password"
+  );
+
+  // message
+  const message = `
+    <div style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
+    <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+        <div style="background-color: #007bff; color: #ffffff; padding: 20px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px;">Welcome to WorkEasy!</h1>
+        </div>
+        <div style="padding: 20px;">
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                Hi <strong>${verifiedWorker.fullname}</strong>,
+            </p>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                 Your account has been successfully logged in.
+            </p>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                Here are your details:
+            </p>
+            <ul style="font-size: 16px; color: #333333; line-height: 1.5;">
+                <li><strong>Full Name:</strong> ${verifiedWorker.fullname}</li>
+                <li><strong>Email:</strong>${verifiedWorker.email}</li>
+            </ul>
+            <p style="font-size: 16px; color: #333333; line-height: 1.5;">
+                If you have any questions or need assistance, feel free to reach out to our support team.
+            </p>
+            <p style="font-size: 16px; color: #007bff; line-height: 1.5;">
+                Best Regards,<br>
+                The WorkEasy Team
+            </p>
+        </div>
+        <div style="background-color: #f4f4f4; color: #777777; padding: 10px; text-align: center;">
+            <p style="font-size: 12px;">&copy; 2025 WorkEasy. All rights reserved.</p>
+        </div>
+    </div>
+</div>
+  `;
+
+  await sendMail({
+    to: verifiedWorker.email,
+    subject: "Welcome to WorkEasy",
+    text: message,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Successfully Verified Otp", verifiedWorker));
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -648,4 +736,5 @@ module.exports = {
   resetPasswordOtpVerification,
   resetPassword,
   loginWorker,
+  loginOtpVerification,
 };
