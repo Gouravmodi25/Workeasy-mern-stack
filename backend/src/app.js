@@ -6,6 +6,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const userRouter = require("./routes/user.routes");
 const workerRouter = require("./routes/worker.routes");
+const bodyParser = require("body-parser");
 
 const originOptions = ["http://localhost:5173", "http://localhost:5174"];
 
@@ -30,7 +31,11 @@ app.options("*", cors(corsOptions));
 app.use(cookieParser());
 
 // for parsing application/json
-app.use(express.json({ limit: "50mb", extended: true }));
+app.use(express.json({ limit: "100mb", extended: true }));
+app.use(express.urlencoded({ extended: true }));
+
+// for body parser
+app.use(bodyParser.json({ limit: "100mb", extended: true }));
 
 // for user api route
 app.use("/api/user", userRouter);
