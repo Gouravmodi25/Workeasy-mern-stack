@@ -727,6 +727,33 @@ const loginOtpVerification = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Successfully Verified Otp", verifiedWorker));
 });
 
+// logout api for worker
+
+const logoutWorker = asyncHandler(async (req, res) => {
+  const { worker } = req;
+
+  const loggedInWorker = await WorkerModel.findByIdAndUpdate(
+    user._id,
+    {
+      $unset: {
+        accessToken: 1,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .json(new ApiResponse(200, "User Logged Out Successfully", loggedInWorker));
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -737,4 +764,5 @@ module.exports = {
   resetPassword,
   loginWorker,
   loginOtpVerification,
+  logoutWorker,
 };
