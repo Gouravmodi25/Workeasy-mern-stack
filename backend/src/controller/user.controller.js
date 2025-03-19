@@ -644,6 +644,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const otp = generateOtp();
 
   user.otp = otp;
+  user.isVerified = false;
   user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
   user.accessToken = accessToken;
   await user.save({ validateBeforeSave: false });
