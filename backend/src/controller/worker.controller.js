@@ -12,6 +12,7 @@ const sendMail = require("../utils/sendEmail.js");
 const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
 const validateAddress = require("../utils/validateAddress.js");
+const fs = require("fs");
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -248,13 +249,15 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
     address,
   } = req.body;
 
+  console.log(req.body);
+
+  const { _id, isVerified } = req.worker;
+
   if (!isVerified) {
     return res
       .status(401)
       .json(new ApiResponse(400, "Please verify the profile with otp"));
   }
-
-  const { _id } = req.worker;
 
   if (
     [
@@ -279,6 +282,8 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
 
     return null;
   };
+
+  console.log(address);
 
   const [genderError, dobError, addressError, availabilityError] = [
     validateGender(gender),
@@ -314,7 +319,7 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
   if (avatarImageLocalPath) {
     try {
       const cloudinaryResponse = await uploadOnCloudinary(avatarImageLocalPath);
-      fs.unlinkSync(avatarImageLocalPath);
+
       if (cloudinaryResponse) {
         avatarImage = cloudinaryResponse.url;
       } else {
@@ -324,6 +329,7 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
             new ApiResponse(400, "Error While uploading image to Cloudinary")
           );
       }
+      // fs.unlinkSync(avatarImageLocalPath);
     } catch (error) {
       return res.status(400).json(new ApiResponse(400, error.message));
     }
@@ -385,9 +391,6 @@ const completeProfileDetailsWorker = asyncHandler(async (req, res) => {
     .status(200)
     .json(new ApiResponse(200, "Profile Completed Successfully", worker));
 });
-
-
-
 
 module.exports = {
   signupWorker,

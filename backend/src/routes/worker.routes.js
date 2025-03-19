@@ -24,6 +24,6 @@ workerRouter.route("/resend-otp").post(workerAuth, resendOtp);
 // worker complete profile
 workerRouter
   .route("/complete-profile")
-  .post(workerAuth, completeProfileDetailsWorker);
+  .post(workerAuth, upload.single("avatarImage"), completeProfileDetailsWorker);
 
 module.exports = workerRouter;
