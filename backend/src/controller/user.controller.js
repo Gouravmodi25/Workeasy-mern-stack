@@ -815,6 +815,8 @@ const loggedOut = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "User Logged Out Successfully", loggedInUser));
 });
 
+// to get logged in user details
+
 const getLoggedInUserDetails = asyncHandler(async (req, res) => {
   const { user } = req;
 
@@ -833,6 +835,26 @@ const getLoggedInUserDetails = asyncHandler(async (req, res) => {
     );
 });
 
+// to fetch all users
+
+const toGetAllUser = asyncHandler(async (req, res) => {
+  const fetchedAllUser = await UserModel.find({}).select("-password");
+
+  if (fetchedAllUser.length === 0) {
+    return res.status(200).json(new ApiResponse(200, "No User Found"));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "All the user are successfully fetched",
+        fetchedAllUser
+      )
+    );
+});
+
 module.exports = {
   signupUser,
   otpVerification,
@@ -846,4 +868,5 @@ module.exports = {
   loginOtpVerification,
   loggedOut,
   getLoggedInUserDetails,
+  toGetAllUser,
 };
