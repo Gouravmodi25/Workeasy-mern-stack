@@ -820,6 +820,12 @@ const loggedOut = asyncHandler(async (req, res) => {
 const getLoggedInUserDetails = asyncHandler(async (req, res) => {
   const { user } = req;
 
+  if (!user.isVerified) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Please verify the profile with otp"));
+  }
+
   const loggedInUser = await UserModel.findById(user._id).select("-password");
 
   if (!loggedInUser) {
