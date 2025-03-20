@@ -892,6 +892,24 @@ const getAllWorker = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Success fully fetch all worker", allWorker));
 });
 
+// to get worker by worker id
+
+const toFetchWorkerByWorkerId = asyncHandler(async (req, res) => {
+  const { workerId } = req.params;
+
+  const worker = await WorkerModel.findById(workerId).select("-password");
+
+  if (!worker) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Failed to fetch worker Worker Not found"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Worker fetched successfully", worker));
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -906,4 +924,5 @@ module.exports = {
   changePassword,
   loggedInWorkerDetails,
   getAllWorker,
+  toFetchWorkerByWorkerId,
 };

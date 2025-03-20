@@ -13,6 +13,7 @@ const {
   changePassword,
   loggedInWorkerDetails,
   getAllWorker,
+  toFetchWorkerByWorkerId,
 } = require("../controller/worker.controller.js");
 const upload = require("../middleware/multer.middleware.js");
 const workerRouter = express.Router();
@@ -76,5 +77,11 @@ workerRouter
 // to get all worker
 
 workerRouter.route("/get-all-worker").get(workerAuth, getAllWorker);
+
+// to get worker by workerId on param
+
+workerRouter
+  .route("/get-worker/:workerId")
+  .get(workerAuth, toFetchWorkerByWorkerId);
 
 module.exports = workerRouter;
