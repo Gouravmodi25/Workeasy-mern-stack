@@ -846,6 +846,32 @@ const changePassword = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Password Changed Successfully", newWorker));
 });
 
+// to get details of logged in worker
+
+const loggedInWorkerDetails = asyncHandler(async (req, res) => {
+  const { worker } = req;
+
+  const loggedInWorker = await WorkerModel.findById(worker._id).select(
+    "-password"
+  );
+
+  if (!loggedInWorker) {
+    return res
+      .status(404)
+      .json(new ApiResponse(404, "Worker not found Please Login"));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Success fully fetched Worker Details",
+        loggedInWorker
+      )
+    );
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
