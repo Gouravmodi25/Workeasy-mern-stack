@@ -904,5 +904,6 @@ module.exports = {
   loginOtpVerification,
   logoutWorker,
   changePassword,
+  loggedInWorkerDetails,
   getAllWorker,
 };
