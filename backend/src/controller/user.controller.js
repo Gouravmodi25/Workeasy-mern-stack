@@ -551,21 +551,22 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 // change password api
 
-const changePasswordApi = asyncHandler(async function (req, res) {
+const changePassword = asyncHandler(async (req, res) => {
   const { _id } = req.user;
+  const { oldPassword, newPassword } = req.body;
 
-  const { newPassword, confirmPassword } = req.body;
-
+  // Check for missing fields
   if (
-    [newPassword, confirmPassword].some(
+    [oldPassword, newPassword].some(
       (field) => String(field || "").trim() === ""
     )
   ) {
     return res
       .status(400)
-      .json(new ApiResponse(400, "All fields are Required"));
+      .json(new ApiResponse(400, "All fields are required"));
   }
 
+  // Check password length
   if (newPassword.length < 8) {
     return res
       .status(400)
@@ -574,37 +575,65 @@ const changePasswordApi = asyncHandler(async function (req, res) {
       );
   }
 
-  if (newPassword !== confirmPassword) {
-    return res
-      .status(400)
-      .json(new ApiResponse(400, "Both Password should be same"));
+  // Find the user and include the password field
+  const user = await UserModel.findById(_id).select("+password");
+  if (!user) {
+    return res.status(404).json(new ApiResponse(404, "User not found"));
   }
 
-  const user = await UserModel.findById(_id).select("+password");
+  if (!user.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Please Verified Otp"));
+  }
 
-  const isSamePassword = user.isSamePassword(newPassword);
+  // Check if the old password is correct
+  const isCorrectPassword = await user.isCorrectPassword(oldPassword);
+  if (!isCorrectPassword) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Old password is not correct"));
+  }
 
-  if (!isSamePassword) {
+  // Check if the new password is the same as the current password
+  const isSamePassword = await user.isCorrectPassword(newPassword);
+  if (isSamePassword) {
     return res
       .status(400)
       .json(
-        new ApiResponse(400, "New Password is not same as previous password")
+        new ApiResponse(
+          400,
+          "New password must be different from the current password"
+        )
       );
   }
 
-  user.password = newPassword;
+  // Check if old and new passwords are the same
+  if (oldPassword === newPassword) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "New password should not be the same as the old password"
+        )
+      );
+  }
 
+  // Update the user's password and save
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: true });
+
+  // Send confirmation email
   await sendMail({
     to: user.email,
-    subject: "Password changed successfully",
+    subject: "Password Changed Successfully",
     text: resetPasswordEmailTemplate(user.fullname),
   });
 
+  // Return success response without the password
   const newUser = await UserModel.findById(user._id).select("-password");
-
   return res
     .status(200)
-    .json(new ApiResponse(200, "Password Reset Successfully", newUser));
+    .json(new ApiResponse(200, "Password Changed Successfully", newUser));
 });
 
 // for user login
@@ -772,6 +801,10 @@ const loggedOut = asyncHandler(async (req, res) => {
     }
   );
 
+  if (!loggedInUser.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Please Verified Otp"));
+  }
+
   const options = {
     secure: true,
   };
@@ -790,7 +823,7 @@ module.exports = {
   forgotPassword,
   resetPasswordOtpVerification,
   resetPassword,
-  changePasswordApi,
+  changePassword,
   loginUser,
   loginOtpVerification,
   loggedOut,

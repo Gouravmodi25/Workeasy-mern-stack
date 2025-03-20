@@ -10,7 +10,7 @@ const {
   forgotPassword,
   resetPasswordOtpVerification,
   resetPassword,
-  changePasswordApi,
+  changePassword,
   loginUser,
   loginOtpVerification,
   loggedOut,
@@ -44,7 +44,7 @@ userRouter
 userRouter.route("/reset-password").patch(resetPassword);
 
 // for changed password
-userRouter.route("/changed-password").patch(userAuth, changePasswordApi);
+userRouter.route("/change-password").patch(userAuth, changePassword);
 
 // login route
 userRouter.route("/login").post(loginUser);
