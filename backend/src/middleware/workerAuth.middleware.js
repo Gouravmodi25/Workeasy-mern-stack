@@ -33,7 +33,7 @@ const workerAuth = asyncHandler(async function (req, res, next) {
     if (!loggedWorker) {
       return res
         .status(401)
-        .json(new ApiResponse(401, "Worker not found. Please log in again."));
+        .json(new ApiResponse(401, "Not Authorized. Please log in again."));
     }
 
     console.log("Logged Worker:", loggedWorker);

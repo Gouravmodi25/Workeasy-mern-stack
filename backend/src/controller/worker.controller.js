@@ -744,6 +744,10 @@ const logoutWorker = asyncHandler(async (req, res) => {
     }
   );
 
+  if (!loggedInWorker.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Please Verified Otp"));
+  }
+
   const options = {
     secure: true,
   };
@@ -752,6 +756,94 @@ const logoutWorker = asyncHandler(async (req, res) => {
     .status(200)
     .clearCookie("accessToken", options)
     .json(new ApiResponse(200, "User Logged Out Successfully", loggedInWorker));
+});
+
+// change password for worker
+
+const changePassword = asyncHandler(async (req, res) => {
+  const { _id } = req.worker;
+  const { oldPassword, newPassword } = req.body;
+
+  // Check for missing fields
+  if (
+    [oldPassword, newPassword].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are required"));
+  }
+
+  // Check password length
+  if (newPassword.length < 8) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "Password must be at least 8 characters long")
+      );
+  }
+
+  // Find the worker and include the password field
+  const worker = await WorkerModel.findById(_id).select("+password");
+
+  if (!worker) {
+    return res.status(404).json(new ApiResponse(404, "User not found"));
+  }
+
+  if (!worker.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Please Verified Otp"));
+  }
+
+  // Check if the old password is correct
+  const isCorrectPassword = await worker.isCorrectPassword(oldPassword);
+  if (!isCorrectPassword) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Old password is not correct"));
+  }
+
+  // Check if the new password is the same as the current password
+  const isSamePassword = await worker.isCorrectPassword(newPassword);
+  if (isSamePassword) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "New password must be different from the current password"
+        )
+      );
+  }
+
+  // Check if old and new passwords are the same
+  if (oldPassword === newPassword) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "New password should not be the same as the old password"
+        )
+      );
+  }
+
+  // Update the worker's password and save
+  worker.password = newPassword;
+  await worker.save({ validateBeforeSave: true });
+
+  // Send confirmation email
+  await sendMail({
+    to: worker.email,
+    subject: "Password Changed Successfully",
+    text: resetPasswordEmailTemplate(worker.fullname),
+  });
+
+  // Return success response without the password
+  const newWorker = await WorkerModel.findById(worker._id).select("-password");
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Password Changed Successfully", newWorker));
 });
 
 module.exports = {
@@ -765,4 +857,5 @@ module.exports = {
   loginWorker,
   loginOtpVerification,
   logoutWorker,
+  changePassword,
 };

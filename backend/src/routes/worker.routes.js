@@ -10,6 +10,7 @@ const {
   loginWorker,
   loginOtpVerification,
   logoutWorker,
+  changePassword,
 } = require("../controller/worker.controller.js");
 const upload = require("../middleware/multer.middleware.js");
 const workerRouter = express.Router();
@@ -59,5 +60,9 @@ workerRouter
 // logout worker
 
 workerRouter.route("/logout").post(workerAuth, logoutWorker);
+
+// changed password
+
+workerRouter.route("/change-password").post(workerAuth, changePassword);
 
 module.exports = workerRouter;
