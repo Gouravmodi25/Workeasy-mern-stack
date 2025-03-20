@@ -14,6 +14,77 @@ const addressSchema = new mongoose.Schema({
   country: { type: String },
 });
 
+// rating schema
+
+const ratingSchema = new mongoose.Schema({
+  rating: {
+    type: Number,
+    min: 0,
+    max: 5,
+    required: true,
+  },
+  review: { type: String },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  appointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Appointment",
+    required: true,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+// appointment history schema
+
+const appointmentHistorySchema = new mongoose.Schema({
+  appointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Appointment",
+    required: true,
+  },
+  appointmentDate: {
+    type: Date,
+    required: true,
+  },
+  charges: {
+    type: Number,
+    required: true,
+  },
+  visitationFees: {
+    type: Number,
+    required: true,
+  },
+  isCompleted: {
+    type: Boolean,
+    default: false,
+  },
+  cancelled: {
+    type: Boolean,
+    default: false,
+  },
+  paymentStatus: {
+    type: String,
+    enum: ["Pending", "Completed", "Failed"],
+    default: "Pending",
+  },
+  refundInitiated: {
+    type: Boolean,
+    default: false,
+    required: true,
+  },
+  refundDetails: {
+    type: Map,
+    of: String,
+    default: {},
+  },
+});
+
 const workerSchema = new Schema({
   // necessary fields
   email: {
