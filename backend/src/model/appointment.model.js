@@ -48,6 +48,7 @@ const appointmentSchema = new mongoose.Schema(
     appointmentBookedDate: {
       type: Date,
       required: true,
+      default: Date.now,
     },
 
     createdAt: {
