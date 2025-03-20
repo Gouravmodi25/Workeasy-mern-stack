@@ -851,6 +851,10 @@ const changePassword = asyncHandler(async (req, res) => {
 const loggedInWorkerDetails = asyncHandler(async (req, res) => {
   const { worker } = req;
 
+  if (!worker.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Please Verified Otp"));
+  }
+
   const loggedInWorker = await WorkerModel.findById(worker._id).select(
     "-password"
   );
