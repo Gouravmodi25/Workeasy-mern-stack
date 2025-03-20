@@ -14,6 +14,8 @@ const {
   loginUser,
   loginOtpVerification,
   loggedOut,
+  getLoggedInUserDetails,
+  toGetAllUser,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -56,5 +58,15 @@ userRouter
 
 // logout user
 userRouter.route("/logout").post(userAuth, loggedOut);
+
+// get logged in user details
+
+userRouter
+  .route("/get-logged-in-user-details")
+  .get(userAuth, getLoggedInUserDetails);
+
+// get all user
+
+userRouter.route("/get-all-user-details").get(userAuth, toGetAllUser);
 
 module.exports = userRouter;
