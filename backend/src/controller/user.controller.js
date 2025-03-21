@@ -874,12 +874,14 @@ const toBookedAppointment = asyncHandler(async (req, res) => {
       .json(new ApiResponse(400, "Please verify the profile with otp"));
   }
 
-  const { workerId } = req.body || req.params;
+  const { workerId } = req.body;
 
-  const { appointmentDate, appointmentTime, status, remarks } = req.body;
+  const { appointmentDate, appointmentTime } = req.body;
+
+  console.log(appointmentDate, appointmentTime);
 
   if (
-    [workerId, appointmentDate, appointmentTime, status, remarks].some(
+    [workerId, appointmentDate, appointmentTime].some(
       (field) => String(field || "").trim() == ""
     )
   ) {
@@ -921,12 +923,6 @@ const toBookedAppointment = asyncHandler(async (req, res) => {
     return res.status(400).json(new ApiResponse(400, timeError));
   }
 
-  const validStatus = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
-
-  if (!validStatus.includes(status)) {
-    return res.status(400).json(new ApiResponse(400, "Status is not valid  "));
-  }
-
   // create appointment
 
   const bookedAppointment = await AppointmentModel.create({
@@ -936,14 +932,32 @@ const toBookedAppointment = asyncHandler(async (req, res) => {
     userData: loggedUser,
     appointmentDate,
     appointmentTime,
+    charges: worker.charges,
+    visitationFees: worker.visitationFees,
   });
 
+  // make history of appointment
+
   bookedAppointment.appointmentHistory.push({
-    status: status,
-    remarks: remarks,
+    status: "Scheduled",
+    remarks: "Appointment Scheduled by User ",
   });
 
   await bookedAppointment.save({ validateBeforeSave: false });
+
+  worker.appointmentHistory.unshift({
+    appointmentId: bookedAppointment._id,
+    userId: loggedUser._id,
+    workerId: worker._id,
+    appointmentDate: bookedAppointment.appointmentDate,
+    appointmentTime: bookedAppointment.appointmentTime,
+    charges: worker.charges,
+    visitationFees: worker.visitationFees,
+    paymentStatus: bookedAppointment.paymentStatus,
+    appointmentStatus: bookedAppointment.appointmentStatus,
+  });
+
+  await worker.save({ validateBeforeSave: false });
 
   if (!bookedAppointment) {
     return res
@@ -951,10 +965,67 @@ const toBookedAppointment = asyncHandler(async (req, res) => {
       .json(new ApiResponse(400, "Error While Booking Appointment"));
   }
 
+  const message = `
+    <div style="background-color: #f9fafb; color: #374151; padding: 40px; border-radius: 15px; max-width: 600px; margin: auto; font-family: Arial, sans-serif; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+    <h2 style="color: #2563eb; margin-bottom: 20px; text-align: center; font-size: 28px;">🎉 Appointment Successfully Booked!</h2>
+    <p style="color: #6b7280; margin: 5px 0; font-size: 16px; text-align: center; line-height: 1.6;">
+        Your appointment has been successfully scheduled. Below are your appointment details:
+    </p>
+    <hr style="border: 0; border-top: 1px solid #d1d5db; margin: 20px 0;">
+
+    <div style="padding: 20px; background-color: #ffffff; border-radius: 10px;">
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Service:</strong> <span style="color: #f59e0b;">${worker.skill}</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Worker:</strong> <span style="color: #f59e0b;">${worker.fullname}</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Date:</strong> <span style="color: #f59e0b;">${bookedAppointment.appointmentDate}</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Time:</strong> <span style="color: #f59e0b;">${bookedAppointment.appointmentTime}</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Charges:</strong> <span style="color: #f59e0b;">${worker.charges} INR</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Visitation Fees:</strong> <span style="color: #f59e0b;">${worker.visitationFees} INR</span>
+        </p>
+        <p style="color: #2563eb; margin: 8px 0; font-size: 20px;">
+            <strong>Payment Status:</strong> <span style="color: #f59e0b;">${bookedAppointment.paymentStatus}</span>
+        </p>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #d1d5db; margin: 20px 0;">
+    <p style="color: #6b7280; font-size: 14px; text-align: center; line-height: 1.6;">
+        Thank you for choosing our service! If you have any questions or need assistance, please feel free to reach out to our support team.
+    </p>
+    <p style="color: #6b7280; font-size: 14px; text-align: center;">
+        Contact us at: <a href="mailto:support@workeasy.com" style="color: #2563eb; text-decoration: none;">support@workeasy.com</a>
+    </p>
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="#" style="background-color: #2563eb; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+            View Appointment Details
+        </a>
+    </div>
+</div>
+  `;
+
+  await sendMail({
+    to: loggedUser.email,
+    subject: "Appointment Booked Successfully",
+    text: message,
+  });
+
   return res
     .status(201)
     .json(
-      new ApiResponse(201, "Appointment Booked Successfully", bookedAppointment)
+      new ApiResponse(
+        201,
+        "Appointment Booked Successfully and awaiting acceptance",
+        bookedAppointment
+      )
     );
 });
 
