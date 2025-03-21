@@ -13,6 +13,8 @@ const dateValidation = (date) => {
   if (dayjs(date).day() === 0) {
     return "Sunday is not available for booking";
   }
+
+  return null;
 };
 
 module.exports = dateValidation;
