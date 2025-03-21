@@ -16,6 +16,7 @@ const {
   loggedOut,
   getLoggedInUserDetails,
   toGetAllUser,
+  toBookedAppointment,
 } = require("../controller/user.controller.js");
 
 const userAuth = require("../middleware/userAuth.middleware.js");
@@ -71,6 +72,6 @@ userRouter.route("/get-all-user-details").get(userAuth, toGetAllUser);
 
 // to booked appointment
 
-userRouter.route("to-booked-appointment").post(userAuth, bookedAppointment);
+userRouter.route("/to-booked-appointment").post(userAuth, toBookedAppointment);
 
 module.exports = userRouter;
