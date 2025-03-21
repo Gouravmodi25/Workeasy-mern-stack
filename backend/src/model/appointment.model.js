@@ -19,13 +19,13 @@ const appointmentSchema = new mongoose.Schema(
     },
 
     workerData: {
-      type: Map,
+      type: Object,
       of: String,
       required: true,
       default: {},
     },
     userData: {
-      type: Map,
+      type: Object,
       of: String,
       required: true,
       default: {},
@@ -120,7 +120,7 @@ const appointmentSchema = new mongoose.Schema(
       default: false,
     },
     refundDetails: {
-      type: Map,
+      type: Object,
       of: String,
       default: {},
     },
@@ -129,7 +129,7 @@ const appointmentSchema = new mongoose.Schema(
 
     appointmentStatus: {
       type: String,
-      enum: ["Scheduled", "Ongoing", "Completed", "Cancelled"],
+      enum: ["Scheduled", "Accepted", "Ongoing", "Completed", "Cancelled"],
       default: "Scheduled",
       index: true,
     },
@@ -149,14 +149,21 @@ const appointmentSchema = new mongoose.Schema(
       },
     },
 
+    // estimated time for appointment
+
+    estimatedTime: {
+      type: String,
+      required: true,
+    },
+
     // working history of appointment
 
     appointmentHistory: [
       {
         status: {
           type: String,
-          enum: ["Scheduled", "Ongoing", "Completed", "Cancelled"],
-          required: true,
+          enum: ["Scheduled", "Accepted", "Ongoing", "Completed", "Cancelled"],
+          default: "Scheduled",
           index: true,
         },
         timestamp: {
