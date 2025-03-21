@@ -48,8 +48,22 @@ const appointmentHistorySchema = new mongoose.Schema({
     ref: "Appointment",
     required: true,
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  workerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Worker",
+    required: true,
+  },
   appointmentDate: {
     type: Date,
+    required: true,
+  },
+  appointmentTime: {
+    type: String,
     required: true,
   },
   charges: {
@@ -68,6 +82,10 @@ const appointmentHistorySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  cancellationReason: {
+    type: String,
+    default: null,
+  },
   paymentStatus: {
     type: String,
     enum: ["Pending", "Completed", "Failed"],
@@ -76,127 +94,154 @@ const appointmentHistorySchema = new mongoose.Schema({
   refundInitiated: {
     type: Boolean,
     default: false,
-    required: true,
   },
   refundDetails: {
-    type: Map,
+    type: Object,
     of: String,
     default: {},
   },
-});
-
-const workerSchema = new Schema({
-  // necessary fields
-  email: {
+  appointmentStatus: {
     type: String,
-    required: true,
-    unique: true,
+    enum: ["Scheduled", "Accepted", "Ongoing", "Completed", "Cancelled"],
     index: true,
   },
-  password: {
-    type: String,
-    required: true,
-    select: false,
-  },
-  fullname: {
-    type: String,
-    required: true,
-    minlength: 3,
-  },
-  phoneNumber: {
-    type: String,
-    unique: true,
-    sparse: true,
-    required: true,
-  },
+});
 
-  //   otp verification
+const workerSchema = new Schema(
+  {
+    // necessary fields
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    fullname: {
+      type: String,
+      required: true,
+      minlength: 3,
+    },
+    phoneNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      required: true,
+    },
 
-  otp: {
-    type: String,
-    select: false,
-  },
-  otpExpires: {
-    type: Date,
-    select: false,
-  },
-  isVerified: {
-    type: Boolean,
-    default: false,
-  },
+    //   otp verification
 
-  //   for profile details
+    otp: {
+      type: String,
+      select: false,
+    },
+    otpExpires: {
+      type: Date,
+      select: false,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
 
-  gender: {
-    type: String,
-    enum: ["Male", "Female", "Transgender", "Other"],
-  },
-  dob: {
-    type: Date,
-  },
-  avatarImage: {
-    type: String,
-  },
-  skill: {
-    type: String,
-  },
-  experience: {
-    type: Number,
-    default: 0,
-  },
-  charges: {
-    type: Number,
-  },
-  availability: {
-    type: String,
-    default: "Available",
-    enum: ["Available", "Unavailable", "On Leave"],
-  },
-  visitationFees: {
-    type: Number,
-  },
-  workerRating: {
-    type: Number,
-    min: 0, // Minimum rating value (if applicable)
-    max: 5, // Maximum rating value
-    validate: {
-      validator: Number.isFinite,
-      message: "Rating must be a valid number",
+    //   for profile details
+
+    gender: {
+      type: String,
+      enum: ["Male", "Female", "Transgender", "Other"],
+    },
+    dob: {
+      type: Date,
+    },
+    avatarImage: {
+      type: String,
+    },
+    skill: {
+      type: String,
+    },
+    experience: {
+      type: Number,
+      default: 0,
+    },
+    charges: {
+      type: Number,
+    },
+    availability: {
+      type: String,
+      default: "Available",
+      enum: ["Available", "Unavailable", "On Leave"],
+    },
+    visitationFees: {
+      type: Number,
+    },
+
+    about: {
+      type: String,
+      maxlength: 500,
+    },
+
+    //  for rating
+
+    rating: [ratingSchema],
+
+    //   for appointment history
+
+    appointmentHistory: [appointmentHistorySchema],
+
+    // total reviews
+
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
+
+    // total earnings
+
+    totalEarnings: {
+      type: Number,
+      default: 0,
+    },
+
+    //   address
+    address: addressSchema,
+
+    //   for reset password token
+    resetPasswordOtp: {
+      type: String,
+    },
+    resetPasswordOtpExpiry: {
+      type: String,
+    },
+
+    isResetOtpVerified: {
+      type: Boolean,
+    },
+
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordTokenExpiry: {
+      type: String,
+    },
+
+    //   for tokens
+    accessToken: {
+      type: String,
+      select: false,
+    },
+    refreshToken: {
+      type: String,
+      select: false,
     },
   },
-
-  //   address
-  address: addressSchema,
-
-  //   for reset password token
-  resetPasswordOtp: {
-    type: String,
-  },
-  resetPasswordOtpExpiry: {
-    type: String,
-  },
-
-  isResetOtpVerified: {
-    type: Boolean,
-  },
-
-  resetPasswordToken: {
-    type: String,
-  },
-  resetPasswordTokenExpiry: {
-    type: String,
-  },
-
-  //   for tokens
-  accessToken: {
-    type: String,
-    select: false,
-  },
-  refreshToken: {
-    type: String,
-    select: false,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
 // for age calculation
 workerSchema.virtual("age").get(function () {
