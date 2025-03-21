@@ -14,6 +14,7 @@ const {
   loggedInWorkerDetails,
   getAllWorker,
   toFetchWorkerByWorkerId,
+  toAcceptJobAppointment,
 } = require("../controller/worker.controller.js");
 const upload = require("../middleware/multer.middleware.js");
 const workerRouter = express.Router();
@@ -81,5 +82,11 @@ workerRouter.route("/get-all-worker").get(getAllWorker);
 // to get worker by workerId on param
 
 workerRouter.route("/get-worker/:workerId").get(toFetchWorkerByWorkerId);
+
+// to accept appointment of user within ten minutes
+
+workerRouter
+  .route("/accept-appointment")
+  .patch(workerAuth, toAcceptJobAppointment);
 
 module.exports = workerRouter;

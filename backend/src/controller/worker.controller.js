@@ -13,6 +13,7 @@ const validateGender = require("../utils/validateGender.js");
 const validateDateOfBirth = require("../utils/validateDateOfBirth.js");
 const validateAddress = require("../utils/validateAddress.js");
 const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
+const AppointmentModel = require("../model/appointment.model.js");
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -914,6 +915,123 @@ const toFetchWorkerByWorkerId = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Worker fetched successfully", worker));
 });
 
+// accepted job appointment
+
+const toAcceptJobAppointment = asyncHandler(async (req, res) => {
+  const { appointmentId } = req.body;
+
+  const { worker } = req;
+
+  const loggedWorker = await WorkerModel.findById(worker._id).select(
+    "-password"
+  );
+
+  if (!loggedWorker) {
+    return res.status(400).json(new ApiResponse(400, "Worker not found"));
+  }
+
+  const appointment = await AppointmentModel.findById(appointmentId);
+
+  if (!appointment) {
+    return res.status(400).json(new ApiResponse(400, "Appointment not found"));
+  }
+
+  if (
+    appointment.appointmentStatus === "Accepted" &&
+    appointment.workerId === worker._id &&
+    appointment.appointmentHistory[0].status === "Accepted"
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Appointment already accepted"));
+  }
+
+  if (
+    appointment.appointmentStatus === "Cancelled" &&
+    appointment.appointmentHistory[0].status === "Cancelled"
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Appointment is cancelled"));
+  }
+
+  if (
+    appointment.appointmentStatus === "Completed" &&
+    appointment.isCompleted &&
+    appointment.appointmentHistory[0].status === "Completed"
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Appointment is already completed"));
+  }
+
+  appointment.appointmentStatus = "Accepted";
+  appointment.appointmentHistory.unshift({
+    status: "Accepted",
+    remarks: "Appointment Accepted by Worker",
+    date: new Date(),
+  });
+
+  await appointment.save({ validateBeforeSave: false });
+
+  worker.appointmentHistory[0].status = appointment.appointmentStatus;
+
+  await worker.save({ validateBeforeSave: false });
+
+  const message = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #1f2937; border-radius: 8px; color: #e5e7eb;">
+    <h2 style="text-align: center; color: #34d399;">✅ Appointment Accepted</h2>
+    <p style="text-align: center; font-size: 16px;">Dear ${user.fullname},</p>
+    <p style="text-align: center; font-size: 16px; line-height: 1.5;">
+        Your appointment has been <strong style="color: #34d399;">accepted</strong> by the worker.
+        Please be ready at your address for the service.
+    </p>
+
+    <div style="margin: 20px 0; padding: 15px; background-color: #111827; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Service:</strong> <span style="color: #fbbf24;">${worker.skill}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Worker:</strong> <span style="color: #fbbf24;">${worker.fullname}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Date:</strong> <span style="color: #fbbf24;">${bookedAppointment.appointmentDate}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Time:</strong> <span style="color: #fbbf24;">${bookedAppointment.appointmentTime}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Address:</strong> <span style="color: #fbbf24;">${user.address.address}, ${user.address.city}, ${user.address.state}, ${user.address.country}</span></p>
+    </div>
+
+    <p style="text-align: center; font-size: 14px; color: #9ca3af;">
+        If you have any questions or need to reschedule, please contact us at: 
+        <a href="mailto:support@workeasy.com" style="color: #34d399; text-decoration: none;">support@workeasy.com</a>
+    </p>
+
+    <p style="text-align: center; font-size: 14px; margin-top: 10px; color: #9ca3af;">
+        Thank you for choosing WorkEasy!
+    </p>
+</div>
+  `;
+
+  await sendMail({
+    to: appointment.userData.email,
+    subject: "Appointment Accepted by Worker",
+    text: message,
+  });
+
+  const newAppointment = await AppointmentModel.findById(
+    appointment._id
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        "Appointment Accepted Successfully by Worker ",
+        newAppointment
+      )
+    );
+});
+
+
+// 
+
+
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -929,4 +1047,5 @@ module.exports = {
   loggedInWorkerDetails,
   getAllWorker,
   toFetchWorkerByWorkerId,
+  toAcceptJobAppointment,
 };
