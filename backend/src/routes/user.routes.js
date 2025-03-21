@@ -69,4 +69,8 @@ userRouter
 
 userRouter.route("/get-all-user-details").get(userAuth, toGetAllUser);
 
+// to booked appointment
+
+userRouter.route("to-booked-appointment").post(userAuth, bookedAppointment);
+
 module.exports = userRouter;

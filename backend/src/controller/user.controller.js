@@ -14,6 +14,10 @@ const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
 const otpVerificationEmailTemplate = require("../utils/otpVerificationEmailTemplate");
 const fs = require("fs");
 const afterOtpVerificationEmailTemplate = require("../utils/afterOtpVerificationEmailTemplate.js");
+const WorkerModel = require("../model/worker.model.js");
+const validateDate = require("../utils/dateValidation.js");
+const validateTime = require("../utils/timeValidation.js");
+const AppointmentModel = require("../model/appointment.model.js");
 
 // for generate accessToken
 
@@ -861,6 +865,99 @@ const toGetAllUser = asyncHandler(async (req, res) => {
     );
 });
 
+const toBookedAppointment = asyncHandler(async (req, res) => {
+  const { user } = req;
+
+  if (!user.isVerified) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Please verify the profile with otp"));
+  }
+
+  const { workerId } = req.body || req.params;
+
+  const { appointmentDate, appointmentTime, status, remarks } = req.body;
+
+  if (
+    [workerId, appointmentDate, appointmentTime, status, remarks].some(
+      (field) => String(field || "").trim() == ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are required"));
+  }
+
+  // get worker
+
+  const worker = await WorkerModel.findById(workerId).select("-password");
+
+  if (!worker) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(400, "Worker not found Please enter right worker id")
+      );
+  }
+
+  if (!worker.isVerified) {
+    return res.status(400).json(new ApiResponse(400, "Worker is not verified"));
+  }
+
+  // get user
+
+  const loggedUser = await UserModel.findById(user._id).select("-password");
+
+  const [dateError, timeError] = [
+    validateDate(appointmentDate),
+    validateTime(appointmentTime),
+  ];
+
+  if (dateError) {
+    return res.status(400).json(new ApiResponse(400, dateError));
+  }
+
+  if (timeError) {
+    return res.status(400).json(new ApiResponse(400, timeError));
+  }
+
+  const validStatus = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
+
+  if (!validStatus.includes(status)) {
+    return res.status(400).json(new ApiResponse(400, "Status is not valid  "));
+  }
+
+  // create appointment
+
+  const bookedAppointment = await AppointmentModel.create({
+    workerId: worker._id,
+    userId: loggedUser._id,
+    workerData: worker,
+    userData: loggedUser,
+    appointmentDate,
+    appointmentTime,
+  });
+
+  bookedAppointment.appointmentHistory.push({
+    status: status,
+    remarks: remarks,
+  });
+
+  await bookedAppointment.save({ validateBeforeSave: false });
+
+  if (!bookedAppointment) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Error While Booking Appointment"));
+  }
+
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(201, "Appointment Booked Successfully", bookedAppointment)
+    );
+});
+
 module.exports = {
   signupUser,
   otpVerification,
@@ -875,4 +972,5 @@ module.exports = {
   loggedOut,
   getLoggedInUserDetails,
   toGetAllUser,
+  toBookedAppointment,
 };
