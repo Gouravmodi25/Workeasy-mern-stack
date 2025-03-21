@@ -76,12 +76,10 @@ workerRouter
 
 // to get all worker
 
-workerRouter.route("/get-all-worker").get(workerAuth, getAllWorker);
+workerRouter.route("/get-all-worker").get(getAllWorker);
 
 // to get worker by workerId on param
 
-workerRouter
-  .route("/get-worker/:workerId")
-  .get(workerAuth, toFetchWorkerByWorkerId);
+workerRouter.route("/get-worker/:workerId").get(toFetchWorkerByWorkerId);
 
 module.exports = workerRouter;
