@@ -1,28 +1,30 @@
 const timeValidation = (time) => {
-  const timeRegex = /^(0[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i;
+  const timeRegex = /^(0[1-9]|1[0-2]):([0-5][0-9])\s?(AM|PM)$/i;
 
   if (!time.match(timeRegex)) {
-    return "Time is not valid Please write time in 12 hours format with am and pm";
+    return "Time is not valid. Please write time in 12-hour format with AM and PM.";
   }
 
-  const [_, hour, minutes, period] = time.match(
-    /^(0[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i
-  );
+  const [, hour, minutes, period] = time.match(timeRegex);
 
-  //   convert hours into 24 hrs format
+  console.log(hour, minutes, period);
 
+  // Convert hours into 24-hour format
   let hours = parseInt(hour, 10);
 
-  if (period.toUpperCase() == "PM" && hours !== 12) {
+  if (period.toUpperCase() === "PM" && hours !== 12) {
     hours += 12;
   }
 
-  if (period.toUpperCase() == "AM" && hours == 12) {
+  if (period.toUpperCase() === "AM" && hours === 12) {
     hours = 0;
   }
 
-  if (hours <= 21 && hours >= 9) {
-    return "Time is not valid Please select time between 9 AM to 9 PM";
+  if (hours < 9 || hours >= 21) {
+    return "Time is not valid. Please select time between 9 AM to 9 PM.";
   }
+
   return null;
 };
+
+module.exports = timeValidation;
