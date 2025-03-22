@@ -1395,4 +1395,5 @@ module.exports = {
   toFetchWorkerByWorkerId,
   toAcceptJobAppointment,
   toCancelJobAppointment,
+  toChangeAvailability,
 };
