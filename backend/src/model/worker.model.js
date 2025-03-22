@@ -78,6 +78,12 @@ const appointmentHistorySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  timeOfCompletion: {
+    type: Date,
+  },
+  startTime: {
+    type: Date,
+  },
   cancelled: {
     type: Boolean,
     default: false,
@@ -104,6 +110,9 @@ const appointmentHistorySchema = new mongoose.Schema({
     type: String,
     enum: ["Scheduled", "Accepted", "Ongoing", "Completed", "Cancelled"],
     index: true,
+  },
+  estimatedTime: {
+    type: String,
   },
 });
 
