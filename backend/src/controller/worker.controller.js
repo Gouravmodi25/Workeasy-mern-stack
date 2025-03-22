@@ -1339,6 +1339,45 @@ const toCancelJobAppointment = asyncHandler(async (req, res) => {
   );
 });
 
+// change availability of worker
+
+const toChangeAvailability = asyncHandler(async (req, res) => {
+  const { worker } = req;
+
+  const { availability } = req.body;
+
+  if (availability.trim() == "") {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Availability is required"));
+  }
+
+  const validAvailability = ["Available", "Unavailable", "On Work", "On Leave"];
+
+  if (!validAvailability.includes(availability)) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "Availability must be valid options are Available ,Unavailable ,On Leave ,On Work"
+        )
+      );
+  }
+
+  const loggedWorker = await WorkerModel.findById(worker._id).select(
+    "-password"
+  );
+
+  loggedWorker.availability = availability;
+
+  await loggedWorker.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Availability changed successfully"));
+});
+
 module.exports = {
   signupWorker,
   otpVerification,

@@ -202,7 +202,7 @@ const workerSchema = new Schema(
     availability: {
       type: String,
       default: "Available",
-      enum: ["Available", "Unavailable", "On Leave"],
+      enum: ["Available", "Unavailable", "On Leave", "On Work"],
     },
     visitationFees: {
       type: Number,
