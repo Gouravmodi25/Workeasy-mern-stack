@@ -73,7 +73,7 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
     },
 
-    // payment cancellation status
+    // appointment cancellation status
 
     cancelled: {
       type: Boolean,
