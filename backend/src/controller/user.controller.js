@@ -906,6 +906,19 @@ const toBookedAppointment = asyncHandler(async (req, res) => {
     return res.status(400).json(new ApiResponse(400, "Worker is not verified"));
   }
 
+  if (
+    worker.availability === "Unavailable" ||
+    worker.availability === "On Leave"
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Worker is not available"));
+  }
+
+  if (worker.isBusy && new Date() < new Date(worker.busyUntil)) {
+    return res.status(400).json(new ApiResponse(400, "Worker is busy"));
+  }
+
   // get user
 
   const loggedUser = await UserModel.findById(user._id).select("-password");
