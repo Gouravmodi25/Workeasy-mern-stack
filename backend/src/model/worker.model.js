@@ -148,6 +148,16 @@ const workerSchema = new Schema(
       default: false,
     },
 
+    // busy status
+
+    busyUntil: {
+      type: Date,
+    }, // New field to track busy time
+    isBusy: {
+      type: Boolean,
+      default: false,
+    },
+
     //   for profile details
 
     gender: {
