@@ -88,6 +88,9 @@ const appointmentHistorySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  reachTime: {
+    type: Date,
+  },
   cancellationReason: {
     type: String,
     default: null,
@@ -113,6 +116,13 @@ const appointmentHistorySchema = new mongoose.Schema({
   },
   estimatedTime: {
     type: String,
+  },
+  remarks: {
+    type: String,
+  },
+  paymentId: {
+    type: String,
+    default: null,
   },
 });
 

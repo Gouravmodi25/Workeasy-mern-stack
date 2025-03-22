@@ -917,10 +917,10 @@ const toFetchWorkerByWorkerId = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Worker fetched successfully", worker));
 });
 
-// accepted job appointment
+// accept job appointment by worker and set reach time for reaching at client location
 
 const toAcceptJobAppointment = asyncHandler(async (req, res) => {
-  const { appointmentId } = req.body;
+  const { appointmentId, reachTime } = req.body;
 
   const { worker } = req;
 
@@ -977,6 +977,8 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
   await appointment.save({ validateBeforeSave: false });
 
   worker.appointmentHistory[0].status = appointment.appointmentStatus;
+  worker.appointmentHistory[0].remarks = "Appointment Accepted by Worker";
+  worker.appointmentHistory[0].reachTime = reachTime;
 
   await worker.save({ validateBeforeSave: false });
 
