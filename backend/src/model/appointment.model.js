@@ -103,6 +103,9 @@ const appointmentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    timeOfCompletion: {
+      type: Date,
+    },
     paymentId: {
       type: String,
       default: null,
@@ -153,7 +156,10 @@ const appointmentSchema = new mongoose.Schema(
 
     estimatedTime: {
       type: String,
-      required: true,
+    },
+
+    startTime: {
+      type: Date,
     },
 
     // working history of appointment
