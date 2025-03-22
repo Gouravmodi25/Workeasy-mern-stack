@@ -16,6 +16,24 @@ const resetPasswordEmailTemplate = require("../utils/resetPasswordTemplate.js");
 const AppointmentModel = require("../model/appointment.model.js");
 const cron = require("node-cron");
 const moment = require("moment");
+const validateTime = require("../utils/timeValidation.js");
+const { default: mongoose } = require("mongoose");
+
+// convert 12 hour format to 24 hour format
+
+const convertTo24HourFormat = (time) => {
+  const [timePart, period] = time.split(" ");
+  let [hours, minutes] = timePart.split(":").map(Number);
+
+  if (period.toUpperCase() === "PM" && hours !== 12) {
+    hours += 12;
+  }
+  if (period.toUpperCase() === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  return { hours, minutes };
+};
 
 // for generating token
 const generateAccessToken = async (workerId) => {
@@ -924,6 +942,22 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
 
   const { worker } = req;
 
+  if (
+    [appointmentId, reachTime].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are required"));
+  }
+
+  const timeError = validateTime(reachTime);
+
+  if (timeError) {
+    return res.status(400).json(new ApiResponse(400, timeError));
+  }
+
   const loggedWorker = await WorkerModel.findById(worker._id).select(
     "-password"
   );
@@ -938,11 +972,26 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
     return res.status(400).json(new ApiResponse(400, "Appointment not found"));
   }
 
+  const { hours: reachHours, minutes: reachMinutes } =
+    convertTo24HourFormat(reachTime);
+  const { hours: appointmentHours, minutes: appointmentMinutes } =
+    convertTo24HourFormat(appointment.appointmentTime);
+
   if (
-    appointment.appointmentStatus === "Accepted" &&
-    appointment.workerId === worker._id &&
-    appointment.appointmentHistory[0].status === "Accepted"
+    reachHours < appointmentHours ||
+    (reachHours === appointmentHours && reachMinutes < appointmentMinutes)
   ) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "Reach time should be greater than or equal to appointment time"
+        )
+      );
+  }
+
+  if (appointment.appointmentStatus === "Accepted") {
     return res
       .status(400)
       .json(new ApiResponse(400, "Appointment already accepted"));
@@ -985,7 +1034,7 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
   const message = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #1f2937; border-radius: 8px; color: #e5e7eb;">
     <h2 style="text-align: center; color: #34d399;">✅ Appointment Accepted</h2>
-    <p style="text-align: center; font-size: 16px;">Dear ${user.fullname},</p>
+    <p style="text-align: center; font-size: 16px;">Dear ${appointment.userData.fullname},</p>
     <p style="text-align: center; font-size: 16px; line-height: 1.5;">
         Your appointment has been <strong style="color: #34d399;">accepted</strong> by the worker.
         Please be ready at your address for the service.
@@ -994,9 +1043,9 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
     <div style="margin: 20px 0; padding: 15px; background-color: #111827; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
         <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Service:</strong> <span style="color: #fbbf24;">${worker.skill}</span></p>
         <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Worker:</strong> <span style="color: #fbbf24;">${worker.fullname}</span></p>
-        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Date:</strong> <span style="color: #fbbf24;">${bookedAppointment.appointmentDate}</span></p>
-        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Time:</strong> <span style="color: #fbbf24;">${bookedAppointment.appointmentTime}</span></p>
-        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Address:</strong> <span style="color: #fbbf24;">${user.address.address}, ${user.address.city}, ${user.address.state}, ${user.address.country}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Date:</strong> <span style="color: #fbbf24;">${appointment.appointmentDate}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Time:</strong> <span style="color: #fbbf24;">${appointment.appointmentTime}</span></p>
+        <p style="font-size: 16px; margin: 8px 0; color: #d1d5db;"><strong>Address:</strong> <span style="color: #fbbf24;">${appointment.userData.address.address}, ${appointment.userData.address.city}, ${appointment.userData.address.state}, ${appointment.userData.address.country}</span></p>
     </div>
 
     <p style="text-align: center; font-size: 14px; color: #9ca3af;">
@@ -1030,20 +1079,6 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
       )
     );
 });
-
-// convert 12 hour format to 24 hour format
-
-const convertTo24HourFormat = (time12h) => {
-  const [time, modifier] = time12h.toUpperCase().split(" ");
-  let [hours, minutes] = time.split(":");
-
-  hours = parseInt(hours, 10);
-
-  if (modifier === "PM" && hours !== 12) hours += 12;
-  if (modifier === "AM" && hours === 12) hours = 0;
-
-  return `${String(hours).padStart(2, "0")}:${minutes}`;
-};
 
 // automatically cancel the appointment if worker is not accepted the appointment within 10 minutes
 
@@ -1090,22 +1125,30 @@ cron.schedule(
 
       if (
         worker &&
-        worker.appointmentHistory[0].appointmentId?.toString() ===
-          appointment._id?.toString() &&
         Array.isArray(worker.appointmentHistory) &&
         worker.appointmentHistory.length > 0
       ) {
-        console.log("Worker found and conditions met");
+        // Find the specific appointment in the worker's history
+        const appointmentIndex = worker.appointmentHistory.findIndex(
+          (history) =>
+            history.appointmentId?.toString() === appointment._id?.toString()
+        );
 
-        worker.appointmentHistory[0].appointmentStatus =
-          appointment.appointmentStatus;
-        worker.appointmentHistory[0].cancelled = true;
-        worker.appointmentHistory[0].cancellationReason =
-          appointment.cancellationReason;
+        if (appointmentIndex !== -1) {
+          console.log("Worker found and appointment matched");
 
-        await worker.save({
-          validateBeforeSave: false,
-        });
+          worker.appointmentHistory[appointmentIndex].appointmentStatus =
+            appointment.appointmentStatus;
+          worker.appointmentHistory[appointmentIndex].cancelled = true;
+          worker.appointmentHistory[appointmentIndex].cancellationReason =
+            appointment.cancellationReason;
+
+          await worker.save({
+            validateBeforeSave: false,
+          });
+        } else {
+          console.log("No matching appointment found in worker history");
+        }
       }
 
       const message = `
@@ -1162,6 +1205,140 @@ cron.schedule(
   })
 );
 
+// to cancelled job appointment by worker
+
+const toCancelJobAppointment = asyncHandler(async (req, res) => {
+  const { appointmentId, cancellationReason } = req.body;
+  const loggedWorker = req.worker;
+
+  if (
+    [appointmentId, cancellationReason].some(
+      (field) => String(field || "").trim() === ""
+    )
+  ) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "All fields are required"));
+  }
+
+  console.log("appointmentId", appointmentId);
+  console.log("workerId", loggedWorker._id);
+
+  const appointment = await AppointmentModel.findOne({
+    _id: appointmentId,
+    workerId: loggedWorker._id,
+  });
+
+  if (!appointment) {
+    return res.status(400).json(new ApiResponse(400, "Appointment not found"));
+    1;
+  }
+
+  const worker = await WorkerModel.findById(appointment.workerId).select(
+    "-password"
+  );
+
+  if (!worker) {
+    return res.status(400).json(new ApiResponse(400, "Worker not found"));
+  }
+
+  if (appointment.appointmentStatus === "Cancelled") {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "Appointment already cancelled"));
+  }
+
+  if (appointment.appointmentStatus === "Completed") {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "You cant cancelled completed appointment"));
+  }
+
+  appointment.cancelled = true;
+  appointment.cancellationReason = cancellationReason;
+  appointment.cancellationDate = Date.now();
+  appointment.appointmentStatus = "Cancelled";
+  appointment.appointmentHistory.unshift({
+    status: "Cancelled",
+    remarks: "Appointment Cancelled by Worker",
+    date: new Date(),
+  });
+
+  await appointment.save({ validateBeforeSave: false });
+
+  if (
+    worker &&
+    Array.isArray(worker.appointmentHistory) &&
+    worker.appointmentHistory.length > 0
+  ) {
+    const appointmentIndex = worker.appointmentHistory.findIndex(
+      (history) =>
+        history.appointmentId?.toString() === appointment._id?.toString()
+    );
+
+    if (appointmentIndex !== -1) {
+      console.log("Worker found and appointment matched");
+
+      worker.appointmentHistory[appointmentIndex].appointmentStatus =
+        appointment.appointmentStatus;
+      worker.appointmentHistory[appointmentIndex].cancelled = true;
+      worker.appointmentHistory[appointmentIndex].cancellationReason =
+        appointment.cancellationReason;
+
+      await worker.save({
+        validateBeforeSave: false,
+      });
+    } else {
+      console.log("No matching appointment found in worker history");
+    }
+  }
+
+  const message = `
+        <div style="background-color: #121212; color: #e5e5e5; font-family: Arial, sans-serif; line-height: 1.6; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
+            <h2 style="text-align: center; color: #ff4d4f; font-size: 24px; margin-bottom: 10px;">🚫 Appointment Status Cancelled</h2>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              Hello <span style="color: #34d399; font-weight: bold;">${appointment.userData.fullname}</span>,
+            </p>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              We regret to inform you that your appointment for the service <span style="color: #ff4d4f; font-weight: bold;">${worker.skill}</span> 
+              scheduled on <span style="color: #ff4d4f; font-weight: bold;">${appointment.appointmentDate}</span> at 
+              <span style="color: #ff4d4f; font-weight: bold;">${appointment.appointmentTime}</span> has been <span style="color: #ff4d4f; font-weight: bold;">cancelled</span>.
+            </p>
+            <div style="background-color: #292929; padding: 10px; border-radius: 8px; margin: 10px 0; color: #a0a0a0;">
+              <p><strong>Service:</strong> ${worker.skill}</p>
+              <p><strong>Worker:</strong> ${worker.fullname}</p>
+              <p><strong>Date:</strong> ${appointment.appointmentDate}</p>
+              <p><strong>Time:</strong> ${appointment.appointmentTime}</p>
+              <p><strong>Reason:</strong> ${appointment.cancellationReason}</p>
+            </div>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              We apologize for any inconvenience caused. If you have any questions or need assistance, please contact us at 
+              <a href="mailto:support@workeasy.com" style="color: #34d399; text-decoration: none;">support@workeasy.com</a>.
+            </p>
+            <hr style="border: 0; border-top: 1px solid #444; margin: 15px 0;">
+            <p style="text-align: center; color: #777; font-size: 12px;">
+              Thank you for choosing WorkEasy. We are here to help you anytime!
+            </p>
+          </div>
+        </div>`;
+
+  await sendMail({
+    to: appointment.userData.email,
+    subject: "Appointment Cancelled",
+    text: message,
+  });
+
+  const newAppointment = await AppointmentModel.findById(appointment._id);
+
+  return res.status(200).json(
+    new ApiResponse(200, "Appointment Cancelled Successfully", {
+      newAppointment,
+      worker,
+    })
+  );
+});
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -1178,4 +1355,5 @@ module.exports = {
   getAllWorker,
   toFetchWorkerByWorkerId,
   toAcceptJobAppointment,
+  toCancelJobAppointment,
 };
