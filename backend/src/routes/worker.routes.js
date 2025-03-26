@@ -17,6 +17,7 @@ const {
   toAcceptJobAppointment,
   toCancelJobAppointment,
   toChangeAvailability,
+  toStartWorkAppointment,
 } = require("../controller/worker.controller.js");
 const upload = require("../middleware/multer.middleware.js");
 const workerRouter = express.Router();
@@ -102,5 +103,11 @@ workerRouter
 workerRouter
   .route("/change-availability")
   .patch(workerAuth, toChangeAvailability);
+
+// change appointment status to ongoing
+
+workerRouter
+  .route("/appointment-ongoing")
+  .patch(workerAuth, toStartWorkAppointment);
 
 module.exports = workerRouter;
