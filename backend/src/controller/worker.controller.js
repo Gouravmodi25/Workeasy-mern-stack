@@ -990,6 +990,25 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
       );
   }
 
+  // Ensure reach time is not more than 20 minutes after appointment time
+  const maxAllowedMinutes = appointmentMinutes + 20;
+  const maxAllowedHour = appointmentHours + Math.floor(maxAllowedMinutes / 60);
+  const maxAllowedMinute = maxAllowedMinutes % 60;
+
+  if (
+    reachHours > maxAllowedHour ||
+    (reachHours === maxAllowedHour && reachMinutes > maxAllowedMinute)
+  ) {
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          "Reach time should not be more than 20 minutes after the appointment time"
+        )
+      );
+  }
+
   if (appointment.appointmentStatus === "Accepted") {
     return res
       .status(400)
@@ -1024,11 +1043,33 @@ const toAcceptJobAppointment = asyncHandler(async (req, res) => {
 
   await appointment.save({ validateBeforeSave: false });
 
-  worker.appointmentHistory[0].status = appointment.appointmentStatus;
-  worker.appointmentHistory[0].remarks = "Appointment Accepted by Worker";
-  worker.appointmentHistory[0].reachTime = reachTime;
+  if (
+    worker &&
+    Array.isArray(worker.appointmentHistory) &&
+    worker.appointmentHistory.length > 0
+  ) {
+    // Find the specific appointment in the worker's history
+    const appointmentIndex = worker.appointmentHistory.findIndex(
+      (history) =>
+        history.appointmentId?.toString() === appointment._id?.toString()
+    );
 
-  await worker.save({ validateBeforeSave: false });
+    if (appointmentIndex !== -1) {
+      console.log("Worker found and appointment matched");
+
+      worker.appointmentHistory[appointmentIndex].appointmentStatus =
+        appointment.appointmentStatus;
+      worker.appointmentHistory[appointmentIndex].remarks =
+        "Appointment Accepted by Worker";
+      worker.appointmentHistory[appointmentIndex].reachTime = reachTime;
+
+      await worker.save({
+        validateBeforeSave: false,
+      });
+    } else {
+      console.log("No matching appointment found in worker history");
+    }
+  }
 
   const message = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #1f2937; border-radius: 8px; color: #e5e7eb;">
@@ -1431,6 +1472,44 @@ const toStartWorkAppointment = asyncHandler(async (req, res) => {
 
     console.log("busy until", typeof calculateBusyUntil(estimateTime));
 
+    const parseTimeString = (timeStr) => {
+      const [time, modifier] = timeStr.split(" ");
+      let [hours, minutes] = time.split(":").map(Number);
+
+      if (modifier === "PM" && hours !== 12) {
+        hours += 12;
+      } else if (modifier === "AM" && hours === 12) {
+        hours = 0;
+      }
+
+      return { hours, minutes };
+    };
+
+    // Get current time and appointment time in 24-hour format
+    const { hours: currentHours, minutes: currentMinutes } = parseTimeString(
+      getCurrentFormattedTime()
+    );
+    const { hours: appointmentHours, minutes: appointmentMinutes } =
+      parseTimeString(appointment.appointmentTime);
+    // Compare timestamps
+
+    console.log(appointmentHours);
+
+    if (
+      currentHours > appointmentHours ||
+      (currentHours === appointmentHours &&
+        currentMinutes >= appointmentMinutes)
+    ) {
+      return res
+        .status(400)
+        .json(
+          new ApiResponse(
+            400,
+            "You cannot start the appointment before the scheduled time."
+          )
+        );
+    }
+
     // check appointment status is ongoing or not
 
     if (appointment.appointmentStatus === "Ongoing" && worker) {
@@ -1569,6 +1648,131 @@ const calculateBusyUntil = (estimateTime) => {
   const ampm = busyUntil.getHours() >= 12 ? "PM" : "AM";
   return `${formattedHours}:${minutesFormatted} ${ampm}`;
 };
+
+// auto cancel appointment after accepting appointment within 20 minutes
+
+cron.schedule(
+  "* * * * *",
+  asyncHandler(async (req, res) => {
+    const now = new Date();
+    const cutoffTime = new Date(now.getTime() - 20 * 60000); // 10 minutes ago
+    const todayDate = new Date().toISOString().split("T")[0];
+
+    const appointments = await AppointmentModel.find({
+      appointmentStatus: "Accepted",
+      appointmentHistory: {
+        $elemMatch: {
+          status: "Accepted",
+        },
+      },
+      appointmentDate: todayDate,
+      appointmentAcceptedDate: { $lte: cutoffTime },
+    });
+
+    console.log("appointments", appointments);
+
+    for (let appointment of appointments) {
+      const worker = await WorkerModel.findById(appointment.workerId).select(
+        "-password"
+      );
+
+      console.log("worker", worker);
+
+      // Cancel the appointment and update the status
+      appointment.appointmentStatus = "Cancelled";
+      appointment.cancelled = true;
+      appointment.cancellationReason =
+        "Worker accepted appointment but did not start work on appointment";
+      appointment.cancellationDate = Date.now();
+      appointment.appointmentHistory.unshift({
+        status: "Cancelled",
+        remarks: "Appointment Cancelled by System",
+        date: new Date(),
+      });
+
+      await appointment.save({ validateBeforeSave: false });
+
+      if (
+        worker &&
+        Array.isArray(worker.appointmentHistory) &&
+        worker.appointmentHistory.length > 0
+      ) {
+        // Find the specific appointment in the worker's history
+        const appointmentIndex = worker.appointmentHistory.findIndex(
+          (history) =>
+            history.appointmentId?.toString() === appointment._id?.toString()
+        );
+
+        if (appointmentIndex !== -1) {
+          console.log("Worker found and appointment matched");
+
+          worker.appointmentHistory[appointmentIndex].appointmentStatus =
+            appointment.appointmentStatus;
+          worker.appointmentHistory[appointmentIndex].cancelled = true;
+          worker.appointmentHistory[appointmentIndex].cancellationReason =
+            appointment.cancellationReason;
+
+          await worker.save({
+            validateBeforeSave: false,
+          });
+        } else {
+          console.log("No matching appointment found in worker history");
+        }
+      }
+
+      const message = `
+        <div style="background-color: #121212; color: #e5e5e5; font-family: Arial, sans-serif; line-height: 1.6; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);">
+            <h2 style="text-align: center; color: #ff4d4f; font-size: 24px; margin-bottom: 10px;">🚫 Appointment Status Cancelled</h2>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              Hello <span style="color: #34d399; font-weight: bold;">${appointment.userData.fullname}</span>,
+            </p>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              We regret to inform you that your appointment for the service <span style="color: #ff4d4f; font-weight: bold;">${worker.skill}</span> 
+              scheduled on <span style="color: #ff4d4f; font-weight: bold;">${appointment.appointmentDate}</span> at 
+              <span style="color: #ff4d4f; font-weight: bold;">${appointment.appointmentTime}</span> has been <span style="color: #ff4d4f; font-weight: bold;">cancelled</span>.
+            </p>
+            <div style="background-color: #292929; padding: 10px; border-radius: 8px; margin: 10px 0; color: #a0a0a0;">
+              <p><strong>Service:</strong> ${worker.skill}</p>
+              <p><strong>Worker:</strong> ${worker.fullname}</p>
+              <p><strong>Date:</strong> ${appointment.appointmentDate}</p>
+              <p><strong>Time:</strong> ${appointment.appointmentTime}</p>
+              <p><strong>Reason:</strong> ${appointment.cancellationReason}</p>
+            </div>
+            <p style="margin: 10px 0; font-size: 16px; color: #b0b0b0;">
+              We apologize for any inconvenience caused. If you have any questions or need assistance, please contact us at 
+              <a href="mailto:support@workeasy.com" style="color: #34d399; text-decoration: none;">support@workeasy.com</a>.
+            </p>
+            <hr style="border: 0; border-top: 1px solid #444; margin: 15px 0;">
+            <p style="text-align: center; color: #777; font-size: 12px;">
+              Thank you for choosing WorkEasy. We are here to help you anytime!
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Sending emails to both the user and the worker
+      await sendMail({
+        to: appointment.userData.email,
+        subject: "Appointment Cancelled",
+        text: message,
+      });
+
+      await sendMail({
+        to: worker.email,
+        subject: "Appointment Cancelled",
+        text: message,
+      });
+    }
+
+    return res.status(200).json(
+      new ApiResponse(200, "Appointment Cancelled Successfully", {
+        appointments,
+        worker,
+      })
+    );
+  })
+);
 
 module.exports = {
   signupWorker,
