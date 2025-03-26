@@ -1,8 +1,10 @@
 const asyncHandler = (handlerFunction) => {
   return async (req, res, next) => {
-    return Promise.resolve(handlerFunction(req, res, next)).catch((error) => {
-      return next(error);
-    });
+    try {
+      await handlerFunction(req, res, next);
+    } catch (error) {
+      next(error); // Ensure error is passed to Express error handler
+    }
   };
 };
 
