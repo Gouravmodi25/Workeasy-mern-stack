@@ -11,6 +11,8 @@ const workerAuth = asyncHandler(async function (req, res, next) {
       ? req.headers["authorization"].split(" ")[1]
       : null);
 
+  console.log(token);
+
   if (!token) {
     return res
       .status(401)
@@ -30,16 +32,18 @@ const workerAuth = asyncHandler(async function (req, res, next) {
       "-password"
     );
 
+    console.log(loggedWorker);
+
     if (!loggedWorker) {
       return res
         .status(401)
         .json(new ApiResponse(401, "Not Authorized. Please log in again."));
     }
 
-    console.log("Logged Worker:", loggedWorker);
-
     // Attach the worker to the request object
     req.worker = loggedWorker;
+    console.log("Logged Worker:", loggedWorker);
+
     next();
   } catch (error) {
     console.error("Token verification failed:", error.message);
