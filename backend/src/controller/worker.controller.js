@@ -17,7 +17,6 @@ const AppointmentModel = require("../model/appointment.model.js");
 const cron = require("node-cron");
 const moment = require("moment");
 const validateTime = require("../utils/timeValidation.js");
-const { default: mongoose } = require("mongoose");
 
 // convert 12 hour format to 24 hour format
 
@@ -1380,6 +1379,197 @@ const toChangeAvailability = asyncHandler(async (req, res) => {
     );
 });
 
+// start the work of appointment by worker
+
+const toStartWorkAppointment = asyncHandler(async (req, res) => {
+  try {
+    const { appointmentId, estimateTime } = req.body;
+    const { worker } = req;
+
+    // Validate required fields
+    if (
+      ![appointmentId, estimateTime].every(
+        (field) => field && String(field).trim()
+      )
+    ) {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, "All fields are required"));
+    }
+
+    // Fetch the appointment
+    const appointment = await AppointmentModel.findById(appointmentId);
+    if (!appointment) {
+      return res
+        .status(400)
+        .json(
+          new ApiResponse(400, "Appointment not found or Invalid Appointment")
+        );
+    }
+
+    // Valid estimate time options
+    const validEstimateTime = [
+      "30 min",
+      "45 min",
+      "60 min",
+      "75 min",
+      "90 min",
+      "120 min",
+    ];
+    if (!validEstimateTime.includes(estimateTime)) {
+      return res
+        .status(400)
+        .json(
+          new ApiResponse(
+            400,
+            "Estimate time isn't valid. Options are 30 min, 45 min, 60 min, 75 min, 90 min, 120 min"
+          )
+        );
+    }
+
+    console.log("getCurrentTimeWithFormat :", getCurrentFormattedTime());
+
+    console.log("busy until", typeof calculateBusyUntil(estimateTime));
+
+    // check appointment status is ongoing or not
+
+    if (appointment.appointmentStatus === "Ongoing" && worker) {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, "Appointment is already ongoing"));
+    }
+
+    // Update appointment if conditions are met
+    if (
+      appointment.appointmentStatus === "Accepted" &&
+      appointment.appointmentHistory.length > 0
+    ) {
+      appointment.appointmentStatus = "Ongoing";
+      appointment.estimatedTime = estimateTime;
+      appointment.startTime = getCurrentFormattedTime();
+
+      appointment.appointmentHistory.unshift({
+        status: "Ongoing",
+        remarks: "Worker started work on the appointment.",
+      });
+
+      await appointment.save({ validateBeforeSave: false });
+    }
+
+    console.log(getCurrentFormattedTime());
+
+    // Update worker's status
+    if (worker && Array.isArray(worker.appointmentHistory)) {
+      const appointmentIndex = worker.appointmentHistory.findIndex(
+        (history) =>
+          history.appointmentId?.toString() === appointment._id?.toString()
+      );
+
+      if (appointmentIndex !== -1) {
+        const busyUntil = calculateBusyUntil(estimateTime);
+
+        worker.appointmentHistory[appointmentIndex].appointmentStatus =
+          appointment.appointmentStatus;
+        worker.appointmentHistory[appointmentIndex].startTime =
+          appointment.startTime;
+        worker.isBusy = true;
+        worker.busyUntil = busyUntil;
+
+        await worker.save({ validateBeforeSave: false });
+      } else {
+        console.log("No matching appointment found in worker history");
+      }
+    }
+
+    // Send email notification
+
+    const message = `
+  
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; background-color: #1a1a1a; border-radius: 8px; color: #e0e0e0;">
+    <h2 style="text-align: center; color: #00d1b2;">🔧 Work Started</h2>
+    <p style="text-align: center; font-size: 16px; margin-bottom: 10px;">Dear ${
+      appointment.userData.fullname
+    },</p>
+    <p style="text-align: center; font-size: 14px; margin-bottom: 20px;">
+        Your worker, <strong style="color: #f39c12;">${
+          worker.fullname
+        }</strong>, has started working on your appointment. 
+        The estimated completion time is <strong style="color: #00d1b2;">${
+          estimateTime.split(" ")[0]
+        } minutes</strong>.
+    </p>
+
+    <div style="background-color: #333; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+        <p style="font-size: 14px; margin: 5px 0;"><strong>Service:</strong> ${
+          worker.skill
+        }</p>
+        <p style="font-size: 14px; margin: 5px 0;"><strong>Worker:</strong> ${
+          worker.fullname
+        }</p>
+        <p style="font-size: 14px; margin: 5px 0;"><strong>Start Time:</strong> ${
+          appointment.startTime
+        }</p>
+        <p style="font-size: 14px; margin: 5px 0;"><strong>Busy Until:</strong> ${
+          worker.busyUntil
+        }</p>
+        <p style="font-size: 14px; margin: 5px 0;"><strong>Address:</strong> ${
+          appointment.userData.address.address
+        }, ${appointment.userData.address.city}, ${
+      appointment.userData.address.state
+    }, ${appointment.userData.address.country}</p>
+    </div>
+
+    <p style="text-align: center; font-size: 12px; color: #888;">
+        For any questions or support, contact us at: 
+        <a href="mailto:support@workeasy.com" style="color: #00d1b2; text-decoration: none;">support@workeasy.com</a>
+    </p>
+    <p style="text-align: center; font-size: 12px; margin-top: 10px; color: #555;">
+        Thank you for choosing WorkEasy!
+    </p>
+</div>
+
+
+  `;
+
+    await sendMail({
+      to: appointment.userData.email,
+      subject: `Appointment started at ${getCurrentFormattedTime()}`,
+      text: message,
+    });
+
+    const newAppointment = await AppointmentModel.findById(appointment._id);
+
+    return res.status(200).json(
+      new ApiResponse(200, "Appointment status changed successfully", {
+        newAppointment,
+        worker,
+      })
+    );
+  } catch (error) {
+    console.error("Error in toStartWorkAppointment:", error);
+    return res.status(500).json(new ApiResponse(500, "Internal server error"));
+  }
+});
+
+// Helper function to get the current formatted time
+const getCurrentFormattedTime = () => {
+  return new Date(Date.now()).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+// Helper function to calculate busyUntil time
+const calculateBusyUntil = (estimateTime) => {
+  const minutes = parseInt(estimateTime);
+  const busyUntil = new Date(Date.now() + minutes * 60000);
+  const formattedHours = busyUntil.getHours() % 12 || 12;
+  const minutesFormatted = busyUntil.getMinutes().toString().padStart(2, "0");
+  const ampm = busyUntil.getHours() >= 12 ? "PM" : "AM";
+  return `${formattedHours}:${minutesFormatted} ${ampm}`;
+};
+
 module.exports = {
   signupWorker,
   otpVerification,
@@ -1398,4 +1588,5 @@ module.exports = {
   toAcceptJobAppointment,
   toCancelJobAppointment,
   toChangeAvailability,
+  toStartWorkAppointment,
 };
