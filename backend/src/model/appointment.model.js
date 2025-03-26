@@ -159,7 +159,7 @@ const appointmentSchema = new mongoose.Schema(
     },
 
     startTime: {
-      type: Date,
+      type: String,
     },
 
     // working history of appointment

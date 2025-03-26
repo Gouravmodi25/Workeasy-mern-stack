@@ -170,8 +170,9 @@ const workerSchema = new Schema(
     // busy status
 
     busyUntil: {
-      type: Date,
-    }, // New field to track busy time
+      type: String,
+    },
+
     isBusy: {
       type: Boolean,
       default: false,
