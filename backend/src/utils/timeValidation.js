@@ -24,6 +24,14 @@ const timeValidation = (time) => {
     return "Time is not valid. Please select time between 9 AM to 9 PM.";
   }
 
+  const now = new Date();
+  const givenTime = new Date();
+  givenTime.setHours(hours, parseInt(minutes, 10), 0, 0);
+
+  if (givenTime < now) {
+    return "Time is not valid. Past times are not acceptable.";
+  }
+
   return null;
 };
 
