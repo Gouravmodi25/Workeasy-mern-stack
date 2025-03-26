@@ -137,6 +137,11 @@ const appointmentSchema = new mongoose.Schema(
       index: true,
     },
 
+    appointmentAcceptedDate: {
+      type: Date,
+      default: null,
+    },
+
     //   appointment feedback
 
     review: {
